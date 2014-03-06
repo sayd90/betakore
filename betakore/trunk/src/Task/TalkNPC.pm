@@ -114,26 +114,38 @@ sub iterate {
 				$self->{x}, $self->{y}));
 
 		} else {
-			my $target = $self->findTarget($npcsList);
-			if ($target) {
-				debug "Target NPC " . $target->name() . " at ($self->{pos}{x},$self->{pos}{y}) found.\n", "ai_npcTalk";
-			} else {
-				$target = $self->findTarget($monstersList);
+			if ($self->{x} && $self->{y}) {
+				my $target = $self->findTarget($npcsList);
 				if ($target) {
-					debug "Target Monster-NPC " . $target->name() . " at ($self->{pos}{x},$self->{pos}{y}) found.\n", "ai_npcTalk";
+					debug "Target NPC " . $target->name() . " at ($self->{pos}{x},$self->{pos}{y}) found.\n", "ai_npcTalk";
+				} else {
+					$target = $self->findTarget($monstersList);
+					if ($target) {
+						debug "Target Monster-NPC " . $target->name() . " at ($self->{pos}{x},$self->{pos}{y}) found.\n", "ai_npcTalk";
+					}
 				}
-			}
 
-			if ($target) {
-				$self->{target} = $target;
-				$self->{ID} = $target->{ID};
+				if ($target) {
+					$self->{target} = $target;
+					$self->{ID} = $target->{ID};
+					$self->{stage} = 'Talking to NPC';
+					$self->{steps} = [parseArgs("x $self->{sequence}")];
+					$self->{time} = time;
+					undef $ai_v{npc_talk}{time};
+					undef $ai_v{npc_talk}{talk};
+					lookAtPosition($self);
+				}
+			} elsif ($talk{ID}) {
+				$self->{ID} = $talk{ID};
+				$self->{target} = $npcsList->getByID($self->{ID});
 				$self->{stage} = 'Talking to NPC';
-				$self->{steps} = [parseArgs("x $self->{sequence}")];
+				$self->{steps} = [parseArgs("$self->{sequence}")];
 				$self->{time} = time;
-				undef $ai_v{npc_talk}{time};
-				undef $ai_v{npc_talk}{talk};
-				lookAtPosition($self);
+				#undef $ai_v{npc_talk}{time};
+				#undef $ai_v{npc_talk}{talk};
+				#lookAtPosition($self);
 			}
+				
 		}
 
 	} elsif ($self->{mapChanged} || ($ai_v{npc_talk}{talk} eq 'close' && $self->{steps}[0] !~ /x/i)) {
@@ -141,7 +153,7 @@ sub iterate {
 		# we could get disconnected.
 		#$messageSender->sendTalkCancel($self->{ID}) if ($npcsList->getByID($self->{ID}));
 		$self->setDone();
-		message TF("Done talking with %s.\n", $self->{target}->name), "ai_npcTalk";
+		message TF("Done talking with %s.\n", $self->{target} ? $self->{target}->name : 'Unknown NPC'), "ai_npcTalk";
 
 	} elsif (timeOut($self->{time}, $timeResponse)) {
 		# If NPC does not respond before timing out, then by default, it's
@@ -195,7 +207,7 @@ sub iterate {
 				$self->cancelTalk();
 			}
 
-		} elsif ( $step !~ /c/i && $ai_v{npc_talk}{talk} eq 'next') {
+		} elsif ( $step !~ /^c$/i && $ai_v{npc_talk}{talk} eq 'next' && !$config{autoTalkCont}) {
 			debug "Auto-continuing NPC Talk - next detected \n", 'ai_npcTalk';
 			$messageSender->sendTalkContinue($talk{ID});
 			return;

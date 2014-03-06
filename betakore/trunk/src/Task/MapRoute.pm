@@ -110,6 +110,7 @@ sub new {
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
 	$self->{mapChangedHook} = Plugins::addHook('Network::Receive::map_changed', \&mapChanged, \@holder);
+	$self->{mapChangeLocalHook} = Plugins::addHook('Network::Receive::map_change', \&mapChanged, \@holder);
 
 	return $self;
 }
@@ -117,6 +118,8 @@ sub new {
 sub DESTROY {
 	my ($self) = @_;
 	Plugins::delHook($self->{mapChangedHook}) if $self->{mapChangedHook};
+	Plugins::delHook($self->{mapChangeLocalHook}) if $self->{mapChangeLocalHook};
+	Plugins::delHook($self->{textHook}) if $self->{textHook};
 	$self->SUPER::DESTROY();
 }
 
@@ -148,16 +151,15 @@ sub iterate {
 		$self->setDone();
 		debug "Map Router has finished traversing the map solution\n", "route";
 
-	} elsif ( $field->baseName ne $self->{mapSolution}[0]{map}
-	     || ( $self->{mapChanged} && !$self->{teleport} ) ) {
+	} elsif ( $field->baseName ne $self->{mapSolution}[0]{map} || ( $self->{mapChanged} && !$self->{teleport} ) || ( $self->{mapChanged} && ($self->{mapSolution}[0]{map} eq $self->{mapSolution}[0]{dest_map}) ) ) {
 		# Solution Map does not match current map
 		debug "Current map " . $field->baseName . " does not match solution [ $self->{mapSolution}[0]{portal} ].\n", "route";
 		delete $self->{substage};
 		delete $self->{timeout};
 		delete $self->{mapChanged};
 		shift @{$self->{mapSolution}};
-
-	} elsif ( $self->{mapSolution}[0]{steps} ) {
+		
+	} elsif ( $self->{mapSolution}[0]{steps} && $self->{mapSolution}[0]{type} ne 'portal' ) {
 		# If current solution has conversation steps specified
 		if ( $self->{substage} eq 'Waiting for Warp' ) {
 			$self->{timeout} = time unless $self->{timeout};
@@ -176,8 +178,7 @@ sub iterate {
 			}
 
 		} elsif (distance($self->{actor}{pos_to}, $self->{mapSolution}[0]{pos}) <= 10) {
-			my ($from,$to) = split /=/, $self->{mapSolution}[0]{portal};
-			if (($self->{actor}{zeny} >= $portals_lut{$from}{dest}{$to}{cost}) || ($char->inventory->getByNameID(7060) && $portals_lut{$from}{dest}{$to}{allow_ticket})) {
+			if (($self->{actor}{zeny} >= $self->{mapSolution}[0]{cost}) || ($char->inventory->getByNameID(7060) && $self->{mapSolution}[0]{ticket})) {
 				# We have enough money for this service.
 				$self->{substage} = 'Waiting for Warp';
 				@{$self}{qw(old_x old_y)} = @{$self->{actor}{pos_to}}{qw(x y)};
@@ -189,7 +190,7 @@ sub iterate {
 				$self->setSubtask($task);
 			} else {
 				error TF("You need %sz to pay for warp service at %s (%s,%s), you have %sz.\n",
-					$portals_lut{$from}{dest}{$to}{cost},
+					$self->{mapSolution}[0]{cost},
 					$field->baseName, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y},
 					$self->{actor}{zeny}), "route";
 					AI::clear(qw/move route mapRoute/);
@@ -203,26 +204,77 @@ sub iterate {
 			debug "MapRoute - We spent too much time; bailing out.\n", "route";
 			$self->setError(TOO_MUCH_TIME, "Too much time spent on route traversal.");
 
-		} elsif ( Task::Route->getRoute(\@solution, $field, $self->{actor}{pos_to}, $self->{mapSolution}[0]{pos}) ) {
-			# NPC is reachable from current position
-			# >> Then "route" to it
-			debug "Walking towards the NPC\n", "route";
-			my $task = new Task::Route(
-				actor => $self->{actor},
-				x => $self->{mapSolution}[0]{pos}{x},
-				y => $self->{mapSolution}[0]{pos}{y},
-				maxTime => $self->{maxTime},
-				distFromGoal => 10 - distance($self->{mapSolution}[0]{pos}, $solution[-1]),
-				avoidWalls => $self->{avoidWalls},
-				solution => \@solution
-			);
-			$self->setSubtask($task);
-
 		} else {
-			# Error, NPC is not reachable from current pos
-			debug "CRITICAL ERROR: NPC is not reachable from current location.\n", "route";
-			error TF("Unable to walk from %s (%s,%s) to NPC at (%s,%s).\n", $field->baseName, @{$self->{actor}{pos_to}}{qw(x y)}, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y}), "route";
-			shift @{$self->{mapSolution}};
+			my $walk = 1;
+
+			# Teleport until we're close enough to the portal
+			$self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
+
+			if ($self->{teleport} && !$field->isCity
+			&& !existsInList($config{route_teleport_notInMaps}, $field->baseName)
+			&& ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
+				my $minDist = $config{route_teleport_minDistance};
+				if ($self->{mapChanged}) {
+					undef $self->{sentTeleport};
+					undef $self->{mapChanged};
+				}
+
+				if (!$self->{sentTeleport}) {
+
+					my $dist = new PathFinding(
+						start => $self->{actor}{pos_to},
+						dest => $self->{mapSolution}[0]{pos},
+						field => $field
+					)->runcount;
+					debug "Distance to NPC is $dist\n", "route_teleport";
+
+					if ($dist <= 0 || $dist > $minDist) {
+						if ($dist > 0 && $config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
+							debug "Teleported $config{route_teleport_maxTries} times. Falling back to walking.\n", "route_teleport";
+						} else {
+							message TF("Attempting to teleport near NPC, try #%s\n", ($self->{teleportTries} + 1)), "route_teleport";
+							if (!useTeleport(1)) {
+								$self->{teleport} = 0;
+							} else {
+								$walk = 0;
+								$self->{sentTeleport} = 1;
+								$self->{teleportTime} = time;
+								$self->{teleportTries}++;
+							}
+						}
+					}
+
+				} elsif (timeOut($self->{teleportTime}, 4)) {
+					debug "Unable to teleport; falling back to walking.\n", "route_teleport";
+					$self->{teleport} = 0;
+				} else {
+					$walk = 0;
+				}
+			}
+			
+			if ($walk) {
+				if ( Task::Route->getRoute(\@solution, $field, $self->{actor}{pos_to}, $self->{mapSolution}[0]{pos}) ) {
+					# NPC is reachable from current position
+					# >> Then "route" to it
+					debug "Walking towards the NPC\n", "route";
+					my $task = new Task::Route(
+						actor => $self->{actor},
+						x => $self->{mapSolution}[0]{pos}{x},
+						y => $self->{mapSolution}[0]{pos}{y},
+						maxTime => $self->{maxTime},
+						distFromGoal => 10 - distance($self->{mapSolution}[0]{pos}, $solution[-1]),
+						avoidWalls => $self->{avoidWalls},
+						solution => \@solution
+					);
+					$self->setSubtask($task);
+
+				} else {
+					# Error, NPC is not reachable from current pos
+					debug "CRITICAL ERROR: NPC is not reachable from current location.\n", "route";
+					error TF("Unable to walk from %s (%s,%s) to NPC at (%s,%s).\n", $field->baseName, @{$self->{actor}{pos_to}}{qw(x y)}, $self->{mapSolution}[0]{pos}{x}, $self->{mapSolution}[0]{pos}{y}), "route";
+					shift @{$self->{mapSolution}};
+				}
+			}
 		}
 
 	} elsif ( $self->{mapSolution}[0]{portal} eq "$self->{mapSolution}[0]{map} $self->{mapSolution}[0]{pos}{x} $self->{mapSolution}[0]{pos}{y}=$self->{mapSolution}[0]{map} $self->{mapSolution}[0]{pos}{x} $self->{mapSolution}[0]{pos}{y}" ) {
@@ -336,20 +388,50 @@ sub iterate {
 					# Portal is reachable from current position
 					# >> Then "route" to it
 					debug "Portal route within same map.\n", "route";
-					my %plugin_args;
-					$plugin_args{object} = $self;
-					$plugin_args{solution} = \@solution;
-					Plugins::callHook('Task::MapRoute::iterate::route_portal_near', \%plugin_args);
-					return 0 if ($plugin_args{return});
 					$self->{teleportTries} = 0;
-					my $task = new Task::Route(
-						actor => $self->{actor},
-						x => $self->{mapSolution}[0]{pos}{x},
-						y => $self->{mapSolution}[0]{pos}{y},
-						maxTime => $self->{maxTime},
-						avoidWalls => $self->{avoidWalls},
-						solution => \@solution
-					);
+					my $task;
+					if ($self->{mapSolution}[0]{activation_text}) {
+						debug "Waiting for activation_text: $self->{mapSolution}[0]{activation_text} \n", 'route/complex';
+						$task = new Task::Chained(tasks => [
+							new Task::Function(function => sub {
+								my ($function) = @_;
+								if (!$self->{textHook}) {
+								$self->{textHook} = Plugins::addHook('packet_localBroadcast' => sub {
+									if ($_[1]{Msg} =~ /$self->{mapSolution}[0]{activation_text}/) {
+										$function->setDone;
+										Plugins::delHook($self->{textHook}) if $self->{textHook};
+									}
+								})};
+							}),
+							new Task::Route(
+								actor => $self->{actor},
+								x => $self->{mapSolution}[0]{pos}{x},
+								y => $self->{mapSolution}[0]{pos}{y},
+								maxTime => $self->{maxTime},
+								avoidWalls => $self->{avoidWalls},
+							),
+						]);
+					} elsif ($self->{mapSolution}[0]{type} eq 'portal') {
+						$task = new Task::Chained(tasks => [
+							new Task::Route(
+								actor => $self->{actor},
+								x => $self->{mapSolution}[0]{pos}{x},
+								y => $self->{mapSolution}[0]{pos}{y},
+								maxTime => $self->{maxTime},
+								avoidWalls => $self->{avoidWalls},
+							),
+							new Task::TalkNPC(sequence => $self->{mapSolution}[0]{steps})
+						]);
+					} else {
+						$task = new Task::Route(
+							actor => $self->{actor},
+							x => $self->{mapSolution}[0]{pos}{x},
+							y => $self->{mapSolution}[0]{pos}{y},
+							maxTime => $self->{maxTime},
+							avoidWalls => $self->{avoidWalls},
+							solution => \@solution
+						);
+					}
 					$self->setSubtask($task);
 
 				} else {

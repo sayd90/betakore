@@ -139,8 +139,7 @@ sub iterate {
 				for my $dest (grep { $entry->{dest}{$_}{enabled} } keys %{$entry->{dest}}) {
 					my $penalty = int(($entry->{dest}{$dest}{steps} ne '') ? $routeWeights{NPC} : $routeWeights{PORTAL});
 					$openlist->{"$portal=$dest"}{walk} = $penalty + scalar @{$self->{solution}};
-					$openlist->{"$portal=$dest"}{zeny} = $entry->{dest}{$dest}{cost};
-					$openlist->{"$portal=$dest"}{allow_ticket} = $entry->{dest}{$dest}{allow_ticket};
+					map { $openlist->{"$portal=$dest"}{$_} = $entry->{dest}{$dest}{$_} unless exists $openlist->{"$portal=$dest"}{$_} } keys %{$entry->{dest}{$dest}};
 				}
 			}
 		}
@@ -215,7 +214,7 @@ sub searchStep {
 	#foreach my $parent (keys %{$openlist})
 	{
 		my ($portal, $dest) = split /=/, $parent;
-		if ($self->{budget} ne '' && !($char->inventory->getByNameID(7060) && $openlist->{$parent}{allow_ticket}) && ($openlist->{$parent}{zeny} > $self->{budget})) {
+		if ($self->{budget} ne '' && !($char->inventory->getByNameID(7060) && $openlist->{$parent}{ticket}) && ($openlist->{$parent}{cost} > $self->{budget})) {
 			# This link is too expensive
 			# We should calculate the entire route cost
 			delete $openlist->{$parent};
@@ -223,10 +222,8 @@ sub searchStep {
 		} else {
 			# MOVE this entry into the CLOSELIST
 			$closelist->{$parent}{walk}   = $openlist->{$parent}{walk};
-			$closelist->{$parent}{zeny}  = $openlist->{$parent}{zeny};
-			$closelist->{$parent}{allow_ticket}  = $openlist->{$parent}{allow_ticket};
 			$closelist->{$parent}{parent} = $openlist->{$parent}{parent};
-			# Then delete in from OPENLIST
+			$closelist->{$parent}{cost}  = $openlist->{$parent}{cost};
 			delete $openlist->{$parent};
 		}
 
@@ -241,12 +238,12 @@ sub searchStep {
 					$arg{portal} = $this;
 					my ($from, $to) = split /=/, $this;
 					($arg{map}, $arg{pos}{x}, $arg{pos}{y}) = split / /, $from;
-					($arg{dest_map}, $arg{dest_pos}{x}, $arg{dest_pos}{y}) = split(' ', $to);
+					($arg{dest_map}, $arg{dest_pos}{x}, $arg{dest_pos}{y}) = split / /, $to;
 					$arg{walk} = $closelist->{$this}{walk};
-					$arg{zeny} = $closelist->{$this}{zeny};
-					$arg{allow_ticket} = $closelist->{$this}{allow_ticket};
-					$arg{steps} = $portals_lut{$from}{dest}{$to}{steps};
-
+					$arg{cost} = $closelist->{$this}{cost};
+					my $hash_1 = \%arg;
+					my $hash_2 = \%{$portals_lut{$from}{dest}{$to}};
+					map { $hash_1->{$_} = $hash_2->{$_} unless exists $hash_1->{$_} } keys %{$hash_2};
 					unshift @{$self->{mapSolution}}, \%arg;
 					$this = $closelist->{$this}{parent};
 				}
@@ -256,8 +253,7 @@ sub searchStep {
 				my $walk = "$self->{dest}{map} $self->{dest}{pos}{x} $self->{dest}{pos}{y}=$self->{dest}{map} $self->{dest}{pos}{x} $self->{dest}{pos}{y}";
 				$closelist->{$walk}{walk} = scalar @{$self->{solution}} + $closelist->{$parent}{$dest}{walk};
 				$closelist->{$walk}{parent} = $parent;
-				$closelist->{$walk}{zeny} = $closelist->{$parent}{zeny};
-				$closelist->{$walk}{allow_ticket} = $closelist->{$parent}{allow_ticket};
+				$closelist->{$walk}{cost} = $closelist->{$parent}{cost};
 				$self->{found} = $walk;
 				$self->{done} = 1;
 				$self->{mapSolution} = [];
@@ -267,10 +263,11 @@ sub searchStep {
 					$arg{portal} = $this;
 					my ($from, $to) = split /=/, $this;
 					($arg{map}, $arg{pos}{x}, $arg{pos}{y}) = split / /, $from;
+					($arg{dest_map}, $arg{dest_pos}{x}, $arg{dest_pos}{y}) = split / /, $to;
 					$arg{walk} = $closelist->{$this}{walk};
-					$arg{zeny} = $closelist->{$this}{zeny};
-					$arg{allow_ticket} = $closelist->{$this}{allow_ticket};
-					$arg{steps} = $portals_lut{$from}{dest}{$to}{steps};
+					my $hash_1 = \%arg;
+					my $hash_2 = \%{$portals_lut{$from}{dest}{$to}};
+					map { $hash_1->{$_} = $hash_2->{$_} unless exists $hash_1->{$_} } keys %{$hash_2};
 
 					unshift @{$self->{mapSolution}}, \%arg;
 					$this = $closelist->{$this}{parent};
@@ -286,15 +283,20 @@ sub searchStep {
 				my $destID = $subchild;
 				my $mapName = $portals_lut{$child}{source}{map};
 				#############################################################
-				my $penalty = int($routeWeights{lc($mapName)}) +
-					int(($portals_lut{$child}{dest}{$subchild}{steps} ne '') ? $routeWeights{NPC} : $routeWeights{PORTAL});
+				my $penalty = int($routeWeights{lc($mapName)});
+				if (defined $portals_lut{$child}{dest}{$subchild}{activation_text}) {
+					$penalty += $routeWeights{AIRSHIP};
+				} elsif (int(($portals_lut{$child}{dest}{$subchild}{steps} ne ''))) {
+					$penalty += $routeWeights{NPC};
+				} else {
+					$penalty += $routeWeights{PORTAL};
+				}
 				my $thisWalk = $penalty + $closelist->{$parent}{walk} + $portals_los{$dest}{$child};
 				if (!exists $closelist->{"$child=$subchild"}) {
 					if ( !exists $openlist->{"$child=$subchild"} || $openlist->{"$child=$subchild"}{walk} > $thisWalk ) {
 						$openlist->{"$child=$subchild"}{parent} = $parent;
 						$openlist->{"$child=$subchild"}{walk} = $thisWalk;
-						$openlist->{"$child=$subchild"}{zeny} = $closelist->{$parent}{zeny} + $portals_lut{$child}{dest}{$subchild}{cost};
-						$openlist->{"$child=$subchild"}{allow_ticket} = $closelist->{$parent}{allow_ticket};
+						$openlist->{"$child=$subchild"}{cost} = $closelist->{$parent}{cost} + $portals_lut{$child}{dest}{$subchild}{cost};
 					}
 				}
 			}

@@ -566,42 +566,44 @@ sub parseMonControl {
 }
 
 sub parsePortals {
-	my $file = shift;
-	my $r_hash = shift;
+	my ($file, $r_hash) = @_;
 	undef %{$r_hash};
-	my $reader = new Utils::TextReader($file);
-	while (!$reader->eof()) {
-		my $line = $reader->readLine();
-		next if $line =~ /^#/;
-		$line =~ s/\cM|\cJ//g;
-		$line =~ s/\s+/ /g;
-		$line =~ s/^\s+|\s+$//g;
-		$line =~ s/(.*)[\s\t]+#.*$/$1/;
-		
-		if ($line =~ /^([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s?(.*)/) {
-		my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $misc) = ($1, $2, $3, $4, $5, $6, $7);
+	my $reader = Utils::TextReader->new($file);
+	my %complex_portal;
+	until ($reader->eof) {
+		$_ = $reader->readLine;
+		s/\r//g;
+		s/(.*)[\s\t]+#.*$/$1/;
+		s/^\s+|\s+$//g;
+		if (/^([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})\s([\w|@|-]+)\s(\d{1,3})\s(\d{1,3})(?:\s+(\{))?$/) {
+			# portal
+			my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $open_bracket) = ($1, $2, $3, $4, $5, $6, $7);
 			my $portal = "$source_map $source_x $source_y";
 			my $dest = "$dest_map $dest_x $dest_y";
+			if ($$r_hash{$portal}{'dest'}{$dest}) {
+				error "$_ \n";
+				exit;
+			}
 			$$r_hash{$portal}{'source'}{'map'} = $source_map;
 			$$r_hash{$portal}{'source'}{'x'} = $source_x;
 			$$r_hash{$portal}{'source'}{'y'} = $source_y;
 			$$r_hash{$portal}{'dest'}{$dest}{'map'} = $dest_map;
 			$$r_hash{$portal}{'dest'}{$dest}{'x'} = $dest_x;
 			$$r_hash{$portal}{'dest'}{$dest}{'y'} = $dest_y;
-			$$r_hash{$portal}{dest}{$dest}{enabled} = 1; # is available permanently (can be used when calculating a route)
-			#$$r_hash{$portal}{dest}{$dest}{active} = 1; # TODO: is available right now (otherwise, wait until it becomes available)
-			if ($misc =~ /^(\d+)\s(\d)\s(.*)$/) { # [cost] [allow_ticket] [talk sequence]
-				$$r_hash{$portal}{'dest'}{$dest}{'cost'} = $1;
-				$$r_hash{$portal}{'dest'}{$dest}{'allow_ticket'} = $2;
-				$$r_hash{$portal}{'dest'}{$dest}{'steps'} = $3;
-			} elsif ($misc =~ /^(\d+)\s(.*)$/) { # [cost] [talk sequence]
-				$$r_hash{$portal}{'dest'}{$dest}{'cost'} = $1;
-				$$r_hash{$portal}{'dest'}{$dest}{'steps'} = $2;
-			} else { # [talk sequence]
-				$$r_hash{$portal}{'dest'}{$dest}{'steps'} = $misc;
+			$$r_hash{$portal}{dest}{$dest}{enabled} = 1;
+			if ($open_bracket) {
+				$complex_portal{'open'} = 1;
+				$complex_portal{'portal'} = $portal;
+				$complex_portal{'dest'} = $dest;
 			}
+		} elsif (/^(\w+):\s+(.+)/) {
+			$complex_portal{'properties'}{$1} = $2;
+		} elsif (/^\}$/) { # reached end of definition, save
+			my $portal = $complex_portal{'portal'};
+			my $dest = $complex_portal{'dest'};
+			map { $$r_hash{$portal}{'dest'}{$dest}{$_} = $complex_portal{'properties'}{$_} } keys %{$complex_portal{'properties'}};
+			undef %complex_portal;
 		}
-		
 	}
 	return 1;
 }
