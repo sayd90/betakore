@@ -1201,6 +1201,450 @@ sub actor_info {
 	# TODO: $args->{ID} eq $accountID
 }
 
+sub actor_look_at {
+	my ($self, $args) = @_;
+	return unless changeToInGameState();
+
+	my $actor = Actor::get($args->{ID});
+	$actor->{look}{head} = $args->{head};
+	$actor->{look}{body} = $args->{body};
+	debug $actor->nameString . " looks at $args->{body}, $args->{head}\n", "parseMsg";
+}
+
+sub actor_movement_interrupted {
+	my ($self, $args) = @_;
+	return unless changeToInGameState();
+	my %coords;
+	$coords{x} = $args->{x};
+	$coords{y} = $args->{y};
+
+	my $actor = Actor::get($args->{ID});
+	$actor->{pos} = {%coords};
+	$actor->{pos_to} = {%coords};
+	if ($actor->isa('Actor::You') || $actor->isa('Actor::Player')) {
+		$actor->{sitting} = 0;
+	}
+	if ($actor->isa('Actor::You')) {
+		debug "Movement interrupted, your coordinates: $coords{x}, $coords{y}\n", "parseMsg_move";
+		AI::clear("move");
+	}
+	if ($char->{homunculus} && $char->{homunculus}{ID} eq $actor->{ID}) {
+		AI::clear("move");
+	}
+}
+
+sub actor_trapped {
+	my ($self, $args) = @_;
+	# original comment was that ID is not a valid ID
+	# but it seems to be, at least on eAthena/Freya
+	my $actor = Actor::get($args->{ID});
+	debug "$actor->nameString() is trapped.\n";
+}
+
+sub area_spell_disappears {
+	my ($self, $args) = @_;
+
+	# The area effect spell with ID dissappears
+	my $ID = $args->{ID};
+	my $spell = $spells{$ID};
+	debug "Area effect ".getSpellName($spell->{type})." ($spell->{binID}) from ".getActorName($spell->{sourceID})." disappeared from ($spell->{pos}{x}, $spell->{pos}{y})\n", "skill", 2;
+	delete $spells{$ID};
+	binRemove(\@spellsID, $ID);
+}
+
+sub arrow_none {
+	my ($self, $args) = @_;
+
+	my $type = $args->{type};
+	if ($type == 0) {
+		delete $char->{'arrow'};
+		if ($config{'dcOnEmptyArrow'}) {
+			$interface->errorDialog(T("Please equip arrow first."));
+			quit();
+		} else {
+			error T("Please equip arrow first.\n");
+		}
+	} elsif ($type == 1) {
+		debug "You can't Attack or use Skills because your Weight Limit has been exceeded.\n";
+	} elsif ($type == 2) {
+		debug "You can't use Skills because Weight Limit has been exceeded.\n";
+	} elsif ($type == 3) {
+		debug "Arrow equipped\n";
+	}
+}
+
+sub arrowcraft_list {
+	my ($self, $args) = @_;
+
+	my $newmsg;
+	my $msg = $args->{RAW_MSG};
+	my $msg_size = $args->{RAW_MSG_SIZE};
+	$self->decrypt(\$newmsg, substr($msg, 4));
+	$msg = substr($msg, 0, 4).$newmsg;
+
+	undef @arrowCraftID;
+	for (my $i = 4; $i < $msg_size; $i += 2) {
+		my $ID = unpack("v1", substr($msg, $i, 2));
+		my $item = $char->inventory->getByNameID($ID);
+		binAdd(\@arrowCraftID, $item->{invIndex});
+	}
+
+	message T("Received Possible Arrow Craft List - type 'arrowcraft'\n");
+}
+
+sub attack_range {
+	my ($self, $args) = @_;
+
+	my $type = $args->{type};
+	debug "Your attack range is: $type\n";
+	return unless changeToInGameState();
+
+	$char->{attack_range} = $type;
+	if ($config{attackDistanceAuto} && $config{attackDistance} != $type) {
+		message TF("Autodetected attackDistance = %s\n", $type), "success";
+		configModify('attackDistance', $type, 1);
+		configModify('attackMaxDistance', $type, 1);
+	}
+}
+
+sub buy_result {
+	my ($self, $args) = @_;
+	if ($args->{fail} == 0) {
+		message T("Buy completed.\n"), "success";
+	} elsif ($args->{fail} == 1) {
+		error T("Buy failed (insufficient zeny).\n");
+	} elsif ($args->{fail} == 2) {
+		error T("Buy failed (insufficient weight capacity).\n");
+	} elsif ($args->{fail} == 3) {
+		error T("Buy failed (too many different inventory items).\n");
+	} elsif ($args->{fail} == 4) {
+		error T("Buy failed (item does not exist in store).\n");
+	} elsif ($args->{fail} == 5) {
+		error T("Buy failed (item cannot be exchanged).\n");
+	} elsif ($args->{fail} == 6) {
+		error T("Buy failed (invalid store).\n");
+	} else {
+		error TF("Buy failed (failure code %s).\n", $args->{fail});
+	}
+}
+
+sub card_merge_list {
+	my ($self, $args) = @_;
+
+	# You just requested a list of possible items to merge a card into
+	# The RO client does this when you double click a card
+	my $newmsg;
+	my $msg = $args->{RAW_MSG};
+	$self->decrypt(\$newmsg, substr($msg, 4));
+	$msg = substr($msg, 0, 4).$newmsg;
+	my ($len) = unpack("x2 v", $msg); # TODO: remove this decrypt cruft
+
+	my $display;
+	$display .= T("-----Card Merge Candidates-----\n");
+
+	my $index;
+	for (my $i = 4; $i < $len; $i += 2) {
+		$index = unpack('v', substr($msg, $i, 2));
+		my $item = $char->inventory->getByServerIndex($index);
+		binAdd(\@cardMergeItemsID, $item->{invIndex});
+		$display .= "$item->{invIndex} $item->{name}\n";
+	}
+
+	$display .= "-------------------------------\n";
+	message $display, "list";
+}
+
+
+sub card_merge_status {
+	my ($self, $args) = @_;
+
+	# something about successful compound?
+	my $item_index = $args->{item_index};
+	my $card_index = $args->{card_index};
+	my $fail = $args->{fail};
+
+	if ($fail) {
+		message T("Card merging failed\n");
+	} else {
+		my $item = $char->inventory->getByServerIndex($item_index);
+		my $card = $char->inventory->getByServerIndex($card_index);
+		message TF("%s has been successfully merged into %s\n",
+			$card->{name}, $item->{name}), "success";
+
+		# Remove one of the card
+		$card->{amount} -= 1;
+		if ($card->{amount} <= 0) {
+			$char->inventory->remove($card);
+		}
+
+		# Rename the slotted item now
+		# FIXME: this is unoptimized
+		use bytes;
+		no encoding 'utf8';
+		my $newcards = '';
+		my $addedcard;
+		for (my $i = 0; $i < 4; $i++) {
+			my $cardData = substr($item->{cards}, $i * 2, 2);
+			if (unpack("v", $cardData)) {
+				$newcards .= $cardData;
+			} elsif (!$addedcard) {
+				$newcards .= pack('v', $card->{nameID});
+				$addedcard = 1;
+			} else {
+				$newcards .= pack("v", 0);
+			}
+		}
+		$item->{cards} = $newcards;
+		$item->setName(itemName($item));
+	}
+
+	undef @cardMergeItemsID;
+	undef $cardMergeIndex;
+}
+
+sub cart_info {
+	my ($self, $args) = @_;
+
+	$cart{items} = $args->{items};
+	$cart{items_max} = $args->{items_max};
+	$cart{weight} = int($args->{weight} / 10);
+	$cart{weight_max} = int($args->{weight_max} / 10);
+	$cart{exists} = 1;
+	debug "[cart_info] received.\n", "parseMsg";
+}
+
+sub cart_add_failed {
+	my ($self, $args) = @_;
+
+	my $reason;
+	if ($args->{fail} == 0) {
+		$reason = T('overweight');
+	} elsif ($args->{fail} == 1) {
+		$reason = T('too many items');
+	} else {
+		$reason = TF("Unknown code %s",$args->{fail});
+	}
+	error TF("Can't Add Cart Item (%s)\n", $reason);
+}
+
+sub cart_items_nonstackable {
+	my ($self, $args) = @_;
+
+	$self->_items_list({
+		# TODO: different classes for inventory/cart/storage items
+		class => 'Actor::Item',
+		hook => 'packet_cart',
+		debug_str => 'Non-Stackable Cart Item',
+		items => [$self->parse_items_nonstackable($args)],
+		getter => sub { $cart{inventory}[$_[0]{index}] },
+		adder => sub { $cart{inventory}[$_[0]{index}] = $_[0] },
+	});
+
+	$ai_v{'inventory_time'} = time + 1;
+	$ai_v{'cart_time'} = time + 1;
+}
+
+sub cart_items_stackable {
+	my ($self, $args) = @_;
+
+	$self->_items_list({
+		class => 'Actor::Item',
+		hook => 'packet_cart',
+		debug_str => 'Stackable Cart Item',
+		items => [$self->parse_items_stackable($args)],
+		getter => sub { $cart{inventory}[$_[0]{index}] },
+		adder => sub { $cart{inventory}[$_[0]{index}] = $_[0] },
+	});
+
+	$ai_v{'inventory_time'} = time + 1;
+	$ai_v{'cart_time'} = time + 1;
+}
+
+sub cart_item_added {
+	my ($self, $args) = @_;
+
+	my $item = $cart{inventory}[$args->{index}] ||= Actor::Item->new;
+	if ($item->{amount}) {
+		$item->{amount} += $args->{amount};
+	} else {
+		$item->{index} = $args->{index};
+		$item->{nameID} = $args->{nameID};
+		$item->{amount} = $args->{amount};
+		$item->{identified} = $args->{identified};
+		$item->{broken} = $args->{broken};
+		$item->{upgrade} = $args->{upgrade};
+		$item->{cards} = $args->{cards};
+		$item->{type} = $args->{type} if (exists $args->{type});
+		$item->{name} = itemName($item);
+	}
+	message TF("Cart Item Added: %s (%d) x %s\n", $item->{name}, $args->{index}, $args->{amount});
+	$itemChange{$item->{name}} += $args->{amount};
+	$args->{item} = $item;
+}
+
+sub cash_dealer {
+	my ($self, $args) = @_;
+
+	undef @cashList;
+	my $cashList = 0;
+	$char->{cashpoint} = unpack("x4 V", $args->{RAW_MSG});
+
+	for (my $i = 8; $i < $args->{RAW_MSG_SIZE}; $i += 11) {
+		my ($price, $dcprice, $type, $ID) = unpack("V2 C v", substr($args->{RAW_MSG}, $i, 11));
+		my $store = $cashList[$cashList] = {};
+		# TODO: use itemName() or itemNameSimple()?
+		my $display = ($items_lut{$ID} ne "") ? $items_lut{$ID} : "Unknown $ID";
+		$store->{name} = $display;
+		$store->{nameID} = $ID;
+		$store->{type} = $type;
+		$store->{price} = $dcprice;
+		$cashList++;
+	}
+
+	$ai_v{npc_talk}{talk} = 'cash';
+	# continue talk sequence now
+	$ai_v{npc_talk}{time} = time;
+
+	message TF("------------CashList (Cash Point: %-5d)-------------\n" .
+		"#    Name                    Type               Price\n", $char->{cashpoint}), "list";
+	my $display;
+	for (my $i = 0; $i < @cashList; $i++) {
+		$display = $cashList[$i]{name};
+		message(swrite(
+			"@<<< @<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<< @>>>>>>>p",
+			[$i, $display, $itemTypes_lut{$cashList[$i]{type}}, $cashList[$i]{price}]),
+			"list");
+	}
+	message("-----------------------------------------------------\n", "list");
+}
+
+sub combo_delay {
+	my ($self, $args) = @_;
+
+	$char->{combo_packet} = ($args->{delay}); #* 15) / 100000;
+	# How was the above formula derived? I think it's better that the manipulation be
+	# done in functions.pl (or whatever sub that handles this) instead of here.
+
+	$args->{actor} = Actor::get($args->{ID});
+	my $verb = $args->{actor}->verb('have', 'has');
+	debug "$args->{actor} $verb combo delay $args->{delay}\n", "parseMsg_comboDelay";
+}
+
+sub cart_item_removed {
+	my ($self, $args) = @_;
+
+	my ($index, $amount) = @{$args}{qw(index amount)};
+
+	my $item = $cart{inventory}[$index];
+	$item->{amount} -= $amount;
+	message TF("Cart Item Removed: %s (%d) x %s\n", $item->{name}, $index, $amount);
+	$itemChange{$item->{name}} -= $amount;
+	if ($item->{amount} <= 0) {
+		$cart{'inventory'}[$index] = undef;
+	}
+	$args->{item} = $item;
+}
+
+sub change_to_constate25 {
+	$net->setState(2.5);
+	undef $accountID;
+}
+
+sub changeToInGameState {
+	Network::Receive::changeToInGameState;
+}
+
+sub character_creation_failed {
+	my ($self, $args) = @_;
+	if ($args->{flag} == 0x0) {
+		message T("Charname already exists.\n"), "info";
+	} elsif ($args->{flag} == 0xFF) {
+		message T("Char creation denied.\n"), "info";
+	} elsif ($args->{flag} == 0x01) {
+		message T("You are underaged.\n"), "info";
+	} else {
+		message T("Character creation failed. " .
+			"If you didn't make any mistake, then the name you chose already exists.\n"), "info";
+	}
+	if (charSelectScreen() == 1) {
+		$net->setState(3);
+		$firstLoginMap = 1;
+		$startingzeny = $chars[$config{'char'}]{'zeny'} unless defined $startingzeny;
+		$sentWelcomeMessage = 1;
+	}
+}
+
+sub character_deletion_successful {
+	if (defined $AI::temp::delIndex) {
+		message TF("Character %s (%d) deleted.\n", $chars[$AI::temp::delIndex]{name}, $AI::temp::delIndex), "info";
+		delete $chars[$AI::temp::delIndex];
+		undef $AI::temp::delIndex;
+		for (my $i = 0; $i < @chars; $i++) {
+			delete $chars[$i] if ($chars[$i] && !scalar(keys %{$chars[$i]}))
+		}
+	} else {
+		message T("Character deleted.\n"), "info";
+	}
+
+	if (charSelectScreen() == 1) {
+		$net->setState(3);
+		$firstLoginMap = 1;
+		$startingzeny = $chars[$config{'char'}]{'zeny'} unless defined $startingzeny;
+		$sentWelcomeMessage = 1;
+	}
+}
+
+sub character_deletion_failed {
+	error T("Character cannot be deleted. Your e-mail address was probably wrong.\n");
+	undef $AI::temp::delIndex;
+	if (charSelectScreen() == 1) {
+		$net->setState(3);
+		$firstLoginMap = 1;
+		$startingzeny = $chars[$config{'char'}]{'zeny'} unless defined $startingzeny;
+		$sentWelcomeMessage = 1;
+	}
+}
+
+sub character_moves {
+	my ($self, $args) = @_;
+
+	return unless changeToInGameState();
+	makeCoordsFromTo($char->{pos}, $char->{pos_to}, $args->{coords});
+	my $dist = sprintf("%.1f", distance($char->{pos}, $char->{pos_to}));
+	debug "You're moving from ($char->{pos}{x}, $char->{pos}{y}) to ($char->{pos_to}{x}, $char->{pos_to}{y}) - distance $dist\n", "parseMsg_move";
+	$char->{time_move} = time;
+	$char->{time_move_calc} = distance($char->{pos}, $char->{pos_to}) * ($char->{walk_speed} || 0.12);
+
+	# Correct the direction in which we're looking
+	my (%vec, $degree);
+	getVector(\%vec, $char->{pos_to}, $char->{pos});
+	$degree = vectorToDegree(\%vec);
+	if (defined $degree) {
+		my $direction = int sprintf("%.0f", (360 - $degree) / 45);
+		$char->{look}{body} = $direction & 0x07;
+		$char->{look}{head} = 0;
+	}
+
+	# Ugly; AI code in network subsystem! This must be fixed.
+	if (AI::action eq "mapRoute" && $config{route_escape_reachedNoPortal} && $dist eq "0.0"){
+	   if (!$portalsID[0]) {
+		if ($config{route_escape_shout} ne "" && !defined($timeout{ai_route_escape}{time})){
+			sendMessage("c", $config{route_escape_shout});
+		}
+ 	   	 $timeout{ai_route_escape}{time} = time;
+	   	 AI::queue("escape");
+	   }
+	}
+}
+
+sub character_name {
+	my ($self, $args) = @_;
+	my $name; # Type: String
+
+	$name = bytesToString($args->{name});
+	debug "Character name received: $name\n";
+}
+
 use constant QTYPE => (
 	0x0 => [0xff, 0xff, 0, 0],
 	0x1 => [0xff, 0x80, 0, 0],
