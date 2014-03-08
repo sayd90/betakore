@@ -1550,10 +1550,6 @@ sub change_to_constate25 {
 	undef $accountID;
 }
 
-sub changeToInGameState {
-	Network::Receive::changeToInGameState;
-}
-
 sub character_creation_failed {
 	my ($self, $args) = @_;
 	if ($args->{flag} == 0x0) {
@@ -1643,6 +1639,493 @@ sub character_name {
 
 	$name = bytesToString($args->{name});
 	debug "Character name received: $name\n";
+}
+
+
+sub character_status {
+	my ($self, $args) = @_;
+
+	my $actor = Actor::get($args->{ID});
+
+	if ($args->{switch} eq '028A') {
+		$actor->{lv} = $args->{lv}; # TODO: test if it is ok to use this piece of information
+		$actor->{opt3} = $args->{opt3};
+	} elsif ($args->{switch} eq '0229' || $args->{switch} eq '0119') {
+		$actor->{opt1} = $args->{opt1};
+		$actor->{opt2} = $args->{opt2};
+	}
+
+	$actor->{option} = $args->{option};
+
+	setStatus($actor, $args->{opt1}, $args->{opt2}, $args->{option});
+}
+
+sub chat_created {
+	my ($self, $args) = @_;
+
+	$currentChatRoom = $accountID;
+	$chatRooms{$accountID} = {%createdChatRoom};
+	binAdd(\@chatRoomsID, $accountID);
+	binAdd(\@currentChatRoomUsers, $char->{name});
+	message T("Chat Room Created\n");
+}
+
+sub chat_info {
+	my ($self, $args) = @_;
+
+	my $title;
+	$self->decrypt(\$title, $args->{title});
+	$title = bytesToString($title);
+
+	my $chat = $chatRooms{$args->{ID}};
+	if (!$chat || !%{$chat}) {
+		$chat = $chatRooms{$args->{ID}} = {};
+		binAdd(\@chatRoomsID, $args->{ID});
+	}
+	$chat->{title} = $title;
+	$chat->{ownerID} = $args->{ownerID};
+	$chat->{limit} = $args->{limit};
+	$chat->{public} = $args->{public};
+	$chat->{num_users} = $args->{num_users};
+
+	Plugins::callHook('packet_chatinfo', {
+	  chatID => $args->{ID},
+	  ownerID => $args->{ownerID},
+	  title => $title,
+	  limit => $args->{limit},
+	  public => $args->{public},
+	  num_users => $args->{num_users}
+	});
+}
+
+sub chat_join_result {
+	my ($self, $args) = @_;
+
+	if ($args->{type} == 1) {
+		message T("Can't join Chat Room - Incorrect Password\n");
+	} elsif ($args->{type} == 2) {
+		message T("Can't join Chat Room - You're banned\n");
+	}
+}
+
+sub chat_modified {
+	my ($self, $args) = @_;
+
+	my $title;
+	$self->decrypt(\$title, $args->{title});
+	$title = bytesToString($title);
+
+	my ($ownerID, $ID, $limit, $public, $num_users) = @{$args}{qw(ownerID ID limit public num_users)};
+
+	if ($ownerID eq $accountID) {
+		$chatRooms{new}{title} = $title;
+		$chatRooms{new}{ownerID} = $ownerID;
+		$chatRooms{new}{limit} = $limit;
+		$chatRooms{new}{public} = $public;
+		$chatRooms{new}{num_users} = $num_users;
+	} else {
+		$chatRooms{$ID}{title} = $title;
+		$chatRooms{$ID}{ownerID} = $ownerID;
+		$chatRooms{$ID}{limit} = $limit;
+		$chatRooms{$ID}{public} = $public;
+		$chatRooms{$ID}{num_users} = $num_users;
+	}
+	message T("Chat Room Properties Modified\n");
+}
+
+sub chat_newowner {
+	my ($self, $args) = @_;
+
+	my $user = bytesToString($args->{user});
+	if ($args->{type} == 0) {
+		if ($user eq $char->{name}) {
+			$chatRooms{$currentChatRoom}{ownerID} = $accountID;
+		} else {
+			my $players = $playersList->getItems();
+			my $player;
+			foreach my $p (@{$players}) {
+				if ($p->{name} eq $user) {
+					$player = $p;
+					last;
+				}
+			}
+
+			if ($player) {
+				my $key = $player->{ID};
+				$chatRooms{$currentChatRoom}{ownerID} = $key;
+			}
+		}
+		$chatRooms{$currentChatRoom}{users}{$user} = 2;
+	} else {
+		$chatRooms{$currentChatRoom}{users}{$user} = 1;
+	}
+}
+
+sub chat_user_join {
+	my ($self, $args) = @_;
+
+	my $user = bytesToString($args->{user});
+	if ($currentChatRoom ne "") {
+		binAdd(\@currentChatRoomUsers, $user);
+		$chatRooms{$currentChatRoom}{users}{$user} = 1;
+		$chatRooms{$currentChatRoom}{num_users} = $args->{num_users};
+		message TF("%s has joined the Chat Room\n", $user);
+	}
+}
+
+sub chat_user_leave {
+	my ($self, $args) = @_;
+
+	my $user = bytesToString($args->{user});
+	delete $chatRooms{$currentChatRoom}{users}{$user};
+	binRemove(\@currentChatRoomUsers, $user);
+	$chatRooms{$currentChatRoom}{num_users} = $args->{num_users};
+	if ($user eq $char->{name}) {
+		binRemove(\@chatRoomsID, $currentChatRoom);
+		delete $chatRooms{$currentChatRoom};
+		undef @currentChatRoomUsers;
+		$currentChatRoom = "";
+		message T("You left the Chat Room\n");
+	} else {
+		message TF("%s has left the Chat Room\n", $user);
+	}
+}
+
+
+sub cast_cancelled {
+	my ($self, $args) = @_;
+
+	# Cast is cancelled
+	my $ID = $args->{ID};
+
+	my $source = Actor::get($ID);
+	$source->{cast_cancelled} = time;
+	my $skill = $source->{casting}->{skill};
+	my $skillName = $skill ? $skill->getName() : T('Unknown');
+	my $domain = ($ID eq $accountID) ? "selfSkill" : "skill";
+	message sprintf($source->verb(T("%s failed to cast %s\n"), T("%s failed to cast %s\n")), $source, $skillName), $domain;
+	Plugins::callHook('packet_castCancelled', {
+		sourceID => $ID
+	});
+	delete $source->{casting};
+}
+
+sub chat_removed {
+	my ($self, $args) = @_;
+
+	binRemove(\@chatRoomsID, $args->{ID});
+	delete $chatRooms{ $args->{ID} };
+}
+
+sub deal_add_other {
+	my ($self, $args) = @_;
+
+	if ($args->{nameID} > 0) {
+		my $item = $currentDeal{other}{ $args->{nameID} } ||= {};
+		$item->{amount} += $args->{amount};
+		$item->{nameID} = $args->{nameID};
+		$item->{identified} = $args->{identified};
+		$item->{broken} = $args->{broken};
+		$item->{upgrade} = $args->{upgrade};
+		$item->{cards} = $args->{cards};
+		$item->{name} = itemName($item);
+		message TF("%s added Item to Deal: %s x %s\n", $currentDeal{name}, $item->{name}, $args->{amount}), "deal";
+	} elsif ($args->{amount} > 0) {
+		$currentDeal{other_zeny} += $args->{amount};
+		my $amount = formatNumber($args->{amount});
+		message TF("%s added %s z to Deal\n", $currentDeal{name}, $amount), "deal";
+	}
+}
+
+sub deal_add_you {
+	my ($self, $args) = @_;
+
+	if ($args->{fail} == 1) {
+		error T("That person is overweight; you cannot trade.\n"), "deal";
+		return;
+	} elsif ($args->{fail} == 2) {
+		error T("This item cannot be traded.\n"), "deal";
+		return;
+	} elsif ($args->{fail}) {
+		error TF("You cannot trade (fail code %s).\n", $args->{fail}), "deal";
+		return;
+	}
+
+	return unless $args->{index} > 0;
+
+	my $item = $char->inventory->getByServerIndex($args->{index});
+	# FIXME: quickly add two items => lastItemAmount is lost => inventory corruption; see also Misc::dealAddItem
+	# FIXME: what will be in case of two items with the same nameID?
+	# TODO: no info about items is stored
+	$currentDeal{you}{$item->{nameID}}{amount} += $currentDeal{lastItemAmount};
+	$currentDeal{you}{$item->{nameID}}{nameID} = $item->{nameID};
+	$item->{amount} -= $currentDeal{lastItemAmount};
+	message TF("You added Item to Deal: %s x %s\n", $item->{name}, $currentDeal{lastItemAmount}), "deal";
+	$itemChange{$item->{name}} -= $currentDeal{lastItemAmount};
+	$currentDeal{you_items}++;
+	$args->{item} = $item;
+	$char->inventory->remove($item) if ($item->{amount} <= 0);
+}
+
+sub deal_begin {
+	my ($self, $args) = @_;
+
+	if ($args->{type} == 0) {
+		error T("That person is too far from you to trade.\n"), "deal";
+	} elsif ($args->{type} == 2) {
+		error T("That person is in another deal.\n"), "deal";
+	} elsif ($args->{type} == 3) {
+		if (%incomingDeal) {
+			$currentDeal{name} = $incomingDeal{name};
+			undef %incomingDeal;
+		} else {
+			my $ID = $outgoingDeal{ID};
+			my $player;
+			$player = $playersList->getByID($ID) if (defined $ID);
+			$currentDeal{ID} = $ID;
+			if ($player) {
+				$currentDeal{name} = $player->{name};
+			} else {
+				$currentDeal{name} = T('Unknown #') . unpack("V", $ID);
+			}
+			undef %outgoingDeal;
+		}
+		message TF("Engaged Deal with %s\n", $currentDeal{name}), "deal";
+	} elsif ($args->{type} == 5) {
+		error T("That person is opening storage.\n"), "deal";
+	} else {
+		error TF("Deal request failed (unknown error %s).\n", $args->{type}), "deal";
+	}
+}
+
+sub deal_cancelled {
+	undef %incomingDeal;
+	undef %outgoingDeal;
+	undef %currentDeal;
+	message T("Deal Cancelled\n"), "deal";
+}
+
+sub deal_complete {
+	undef %outgoingDeal;
+	undef %incomingDeal;
+	undef %currentDeal;
+	message T("Deal Complete\n"), "deal";
+}
+
+sub deal_finalize {
+	my ($self, $args) = @_;
+	if ($args->{type} == 1) {
+		$currentDeal{other_finalize} = 1;
+		message TF("%s finalized the Deal\n", $currentDeal{name}), "deal";
+
+	} else {
+		$currentDeal{you_finalize} = 1;
+		# FIXME: shouldn't we do this when we actually complete the deal?
+		$char->{zeny} -= $currentDeal{you_zeny};
+		message T("You finalized the Deal\n"), "deal";
+	}
+}
+
+sub deal_request {
+	my ($self, $args) = @_;
+	my $level = $args->{level} || 'Unknown'; # TODO: store this info
+	my $user = bytesToString($args->{user});
+
+	$incomingDeal{name} = $user;
+	$timeout{ai_dealAutoCancel}{time} = time;
+	message TF("%s (level %s) Requests a Deal\n", $user, $level), "deal";
+	message T("Type 'deal' to start dealing, or 'deal no' to deny the deal.\n"), "deal";
+}
+
+sub devotion {
+	my ($self, $args) = @_;
+	my $msg = '';
+	my $source = Actor::get($args->{sourceID});
+
+	undef $devotionList->{$args->{sourceID}};
+	for (my $i = 0; $i < 5; $i++) {
+		my $ID = substr($args->{targetIDs}, $i*4, 4);
+		last if unpack("V", $ID) == 0;
+		$devotionList->{$args->{sourceID}}->{targetIDs}->{$ID} = $i;
+		my $actor = Actor::get($ID);
+		#FIXME: Need a better display
+		$msg .= skillUseNoDamage_string($source, $actor, 0, 'devotion');
+	}
+	$devotionList->{$args->{sourceID}}->{range} = $args->{range};
+
+	message "$msg", "devotion";
+}
+
+sub egg_list {
+	my ($self, $args) = @_;
+	message T("----- Egg Hatch Candidates -----\n"), "list";
+	for (my $i = 4; $i < $args->{RAW_MSG_SIZE}; $i += 2) {
+		my $index = unpack("v1", substr($args->{RAW_MSG}, $i, 2));
+		my $item = $char->inventory->getByServerIndex($index);
+		message "$item->{invIndex} $item->{name}\n", "list";
+	}
+	message "------------------------------\n", "list";
+}
+
+sub emoticon {
+	my ($self, $args) = @_;
+	my $emotion = $emotions_lut{$args->{type}}{display} || "<emotion #$args->{type}>";
+
+	if ($args->{ID} eq $accountID) {
+		message "$char->{name}: $emotion\n", "emotion";
+		chatLog("e", "$char->{name}: $emotion\n") if (existsInList($config{'logEmoticons'}, $args->{type}) || $config{'logEmoticons'} eq "all");
+
+	} elsif (my $player = $playersList->getByID($args->{ID})) {
+		my $name = $player->name;
+
+		#my $dist = "unknown";
+		my $dist = distance($char->{pos_to}, $player->{pos_to});
+		$dist = sprintf("%.1f", $dist) if ($dist =~ /\./);
+
+		# Translation Comment: "[dist=$dist] $name ($player->{binID}): $emotion\n"
+		message TF("[dist=%s] %s (%d): %s\n", $dist, $name, $player->{binID}, $emotion), "emotion";
+		chatLog("e", "$name".": $emotion\n") if (existsInList($config{'logEmoticons'}, $args->{type}) || $config{'logEmoticons'} eq "all");
+
+		my $index = AI::findAction("follow");
+		if ($index ne "") {
+			my $masterID = AI::args($index)->{ID};
+			if ($config{'followEmotion'} && $masterID eq $args->{ID} &&
+			       distance($char->{pos_to}, $player->{pos_to}) <= $config{'followEmotion_distance'})
+			{
+				my %args = ();
+				$args{timeout} = time + rand (1) + 0.75;
+
+				if ($args->{type} == 30) {
+					$args{emotion} = 31;
+				} elsif ($args->{type} == 31) {
+					$args{emotion} = 30;
+				} else {
+					$args{emotion} = $args->{type};
+				}
+
+				AI::queue("sendEmotion", \%args);
+			}
+		}
+	} elsif (my $monster = $monstersList->getByID($args->{ID}) || $slavesList->getByID($args->{ID})) {
+		my $dist = distance($char->{pos_to}, $monster->{pos_to});
+		$dist = sprintf("%.1f", $dist) if ($dist =~ /\./);
+
+		# Translation Comment: "[dist=$dist] $monster->name ($monster->{binID}): $emotion\n"
+		message TF("[dist=%s] %s %s (%d): %s\n", $dist, $monster->{actorType}, $monster->name, $monster->{binID}, $emotion), "emotion";
+
+	} else {
+		my $actor = Actor::get($args->{ID});
+		my $name = $actor->name;
+
+		my $dist = T("unknown");
+		if (!$actor->isa('Actor::Unknown')) {
+			$dist = distance($char->{pos_to}, $actor->{pos_to});
+			$dist = sprintf("%.1f", $dist) if ($dist =~ /\./);
+		}
+
+		message TF("[dist=%s] %s: %s\n", $dist, $actor->nameIdx, $emotion), "emotion";
+		chatLog("e", "$name".": $emotion\n") if (existsInList($config{'logEmoticons'}, $args->{type}) || $config{'logEmoticons'} eq "all");
+	}
+	Plugins::callHook('packet_emotion', {
+		emotion => $emotion,
+		ID => $args->{ID}
+	});
+}
+
+sub equip_item {
+	my ($self, $args) = @_;
+	my $item = $char->inventory->getByServerIndex($args->{index});
+	if (!$args->{success}) {
+		message TF("You can't put on %s (%d)\n", $item->{name}, $item->{invIndex});
+	} else {
+		$item->{equipped} = $args->{type};
+		if ($args->{type} == 10 || $args->{type} == 32768) {
+			$char->{equipment}{arrow} = $item;
+		} else {
+			foreach (%equipSlot_rlut){
+				if ($_ & $args->{type}){
+					next if $_ == 10; # work around Arrow bug
+					next if $_ == 32768;
+					$char->{equipment}{$equipSlot_lut{$_}} = $item;
+				}
+			}
+		}
+		message TF("You equip %s (%d) - %s (type %s)\n", $item->{name}, $item->{invIndex},
+			$equipTypes_lut{$item->{type_equip}}, $args->{type}), 'inventory';
+	}
+	$ai_v{temp}{waitForEquip}-- if $ai_v{temp}{waitForEquip};
+}
+
+sub errors {
+	my ($self, $args) = @_;
+
+	Plugins::callHook('disconnected') if ($net->getState() == Network::IN_GAME);
+	if ($net->getState() == Network::IN_GAME &&
+		($config{dcOnDisconnect} > 1 ||
+		($config{dcOnDisconnect} &&
+		$args->{type} != 3 &&
+		$args->{type} != 10))) {
+		message T("Lost connection; exiting\n");
+		$quit = 1;
+	}
+
+	$net->setState(1);
+	undef $conState_tries;
+
+	$timeout_ex{'master'}{'time'} = time;
+	$timeout_ex{'master'}{'timeout'} = $timeout{'reconnect'}{'timeout'};
+	if (($args->{type} != 0)) {
+		$net->serverDisconnect();
+	}
+	if ($args->{type} == 0) {
+		# FIXME BAN_SERVER_SHUTDOWN is 0x1, 0x0 is BAN_UNFAIR
+		error T("Server shutting down\n"), "connection";
+		if($config{'dcOnServerShutDown'} == 1) {
+			$quit = 1;
+		}
+	} elsif ($args->{type} == 1) {
+		error T("Error: Server is closed\n"), "connection";
+		if($config{'dcOnServerClose'} == 1) {
+			$quit = 1;
+		}
+	} elsif ($args->{type} == 2) {
+		if ($config{'dcOnDualLogin'} == 1) {
+			$interface->errorDialog(TF("Critical Error: Dual login prohibited - Someone trying to login!\n\n" .
+				"%s will now immediately 	disconnect.", $Settings::NAME));
+			$quit = 1;
+		} elsif ($config{'dcOnDualLogin'} >= 2) {
+			error T("Critical Error: Dual login prohibited - Someone trying to login!\n"), "connection";
+			message TF("Disconnect for %s seconds...\n", $config{'dcOnDualLogin'}), "connection";
+			$timeout_ex{'master'}{'timeout'} = $config{'dcOnDualLogin'};
+		} else {
+			error T("Critical Error: Dual login prohibited - Someone trying to login!\n"), "connection";
+		}
+
+	} elsif ($args->{type} == 3) {
+		error T("Error: Out of sync with server\n"), "connection";
+	} elsif ($args->{type} == 4) {
+		# fRO: "Your account is not validated, please click on the validation link in your registration mail."
+		error T("Error: Server is jammed due to over-population.\n"), "connection";
+	} elsif ($args->{type} == 5) {
+		error T("Error: You are underaged and cannot join this server.\n"), "connection";
+	} elsif ($args->{type} == 6) {
+		$interface->errorDialog(T("Critical Error: You must pay to play this account!\n"));
+		$quit = 1 unless ($net->version == 1);
+	} elsif ($args->{type} == 8) {
+		error T("Error: The server still recognizes your last connection\n"), "connection";
+	} elsif ($args->{type} == 9) {
+		error T("Error: IP capacity of this Internet Cafe is full. Would you like to pay the personal base?\n"), "connection";
+	} elsif ($args->{type} == 10) {
+		error T("Error: You are out of available time paid for\n"), "connection";
+	} elsif ($args->{type} == 15) {
+		error T("Error: You have been forced to disconnect by a GM\n"), "connection";
+	} elsif ($args->{type} == 101) {
+		error T("Error: Your account has been suspended until the next maintenance period for possible use of 3rd party programs\n"), "connection";
+	} elsif ($args->{type} == 102) {
+		error T("Error: For an hour, more than 10 connections having same IP address, have made. Please check this matter.\n"), "connection";
+	} else {
+		error TF("Unknown error %s\n", $args->{type}), "connection";
+	}
 }
 
 use constant QTYPE => (
