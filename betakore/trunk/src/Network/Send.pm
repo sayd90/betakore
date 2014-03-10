@@ -194,7 +194,7 @@ sub encryptMessageID {
 			$$r_message = pack("v", $messageID) . substr($$r_message, 2);
 
 			# Debug Log	
-			debug (sprintf("Encrypted MID : [%04X]->[%04X] / KEY : [0x%04X]->[0x%04X]\n", $oldMID, $messageID, $oldKey, ($self->{encryption}->{crypt_key} >> 16) & 0x7FFF), "sendPacket", 0) if $config{debugPacket_sent};
+			debug sprintf("Encrypted MID : [%04X]->[%04X] / KEY : [0x%04X]->[0x%04X]\n", $oldMID, $messageID, $oldKey, ($self->{encryption}->{crypt_key} >> 16) & 0x7FFF), "encryption";
 		}
 	} else {
 		use bytes;
