@@ -115,7 +115,7 @@ sub new {
 	# int maxCastTries
 	# The maximum number of times to try to re-cast the skill before
 	# we give up.
-	$self->{maxCastTries} = DEFAULT_MAX_CAST_TRIES;
+	$self->{maxCastTries} = $args{maxCastTries} || DEFAULT_MAX_CAST_TRIES;
 
 	# boolean castingFinished
 	# Whether casting has finished.
