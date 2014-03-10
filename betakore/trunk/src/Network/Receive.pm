@@ -5815,6 +5815,10 @@ sub warp_portal_list {
 		# We have already successfully used the Teleport skill.
 		$messageSender->sendWarpTele(26, AI::args->{lv} == 2 ? "$config{saveMap}.gat" : "Random");
 		AI::dequeue;
+	} elsif ($args->{type} == 26 && !$taskManager->isMutexActive('teleport')) {
+		# FIXME: THIS WILL RENDER US UNABLE TO USE THE PORTAL SKILL
+		debug "Cancelling a probably unwanted warp list \n", "teleport";
+		$messageSender->sendWarpTele(27, 'cancel');
 	}
 }
 

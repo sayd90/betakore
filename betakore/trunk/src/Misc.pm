@@ -2923,12 +2923,18 @@ sub updatePlayerNameCache {
 		$playerNameCache{$ID} = \%entry;
 	}
 }
-
+use Task::Teleport::Random;
 ##
 # useTeleport(level)
 # level: 1 to teleport to a random spot, 2 to respawn.
 sub useTeleport {
 	my ($use_lvl, $internal, $emergency) = @_;
+	if ($use_lvl == 1) {
+		$taskManager->add(
+			Task::Teleport::Random->new(useSkill => $config{teleportAuto_useSkill})
+		); 
+		return 1;
+	}
 		
 	my %args = (
 		level => $use_lvl, # 1 = Teleport, 2 = respawn
