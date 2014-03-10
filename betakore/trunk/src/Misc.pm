@@ -2929,12 +2929,14 @@ use Task::Teleport::Random;
 # level: 1 to teleport to a random spot, 2 to respawn.
 sub useTeleport {
 	my ($use_lvl, $internal, $emergency) = @_;
-	if ($use_lvl == 1) {
+	if (!$taskManager->isMutexActive('teleport') && !$taskManager->countTasksByName('Teleport')) {
 		$taskManager->add(
-			Task::Teleport::Random->new(useSkill => $config{teleportAuto_useSkill})
-		); 
-		return 1;
+			Task::Teleport->new(useSkill => $config{teleportAuto_useSkill}, type => ($use_lvl - 1), emergency => $emergency)
+		);
 	}
+	
+	# old code:
+=pod
 		
 	my %args = (
 		level => $use_lvl, # 1 = Teleport, 2 = respawn
@@ -3077,6 +3079,7 @@ sub useTeleport {
 	}
 	
 	return 0;
+=cut
 }
 
 ##

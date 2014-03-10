@@ -4450,9 +4450,10 @@ sub skill_used_no_damage {
 	message $disp, $domain;
 
 	# Set teleport time
-	if ($args->{sourceID} eq $accountID && $skill->getHandle() eq 'AL_TELEPORT') {
-		$timeout{ai_teleport_delay}{time} = time;
-	}
+	# TODO: remove, deprecated by Task::Teleport
+	# if ($args->{sourceID} eq $accountID && $skill->getHandle() eq 'AL_TELEPORT') {
+		# $timeout{ai_teleport_delay}{time} = time;
+	# }
 
 	if ($AI == AI::AUTO && $config{'autoResponseOnHeal'}) {
 		# Handle auto-response on heal
@@ -5810,16 +5811,6 @@ sub warp_portal_list {
 			"list");
 	}
 	message("--------------------------------------------------\n", "list");
-	
-	if ($args->{type} == 26 && AI::inQueue('teleport')) {
-		# We have already successfully used the Teleport skill.
-		$messageSender->sendWarpTele(26, AI::args->{lv} == 2 ? "$config{saveMap}.gat" : "Random");
-		AI::dequeue;
-	} elsif ($args->{type} == 26 && !$taskManager->isMutexActive('teleport')) {
-		# FIXME: THIS WILL RENDER US UNABLE TO USE THE PORTAL SKILL
-		debug "Cancelling a probably unwanted warp list \n", "teleport";
-		$messageSender->sendWarpTele(27, 'cancel');
-	}
 }
 
 
