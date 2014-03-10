@@ -21,7 +21,7 @@ use Carp::Assert;
 
 use Task::WithSubtask;
 use base qw(Task::WithSubtask);
-use Globals qw($net $char);
+use Globals qw($net $char %timeout);
 
 sub new {
 	my $class = shift;
