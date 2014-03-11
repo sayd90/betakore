@@ -21,7 +21,7 @@ use Carp::Assert;
 
 use Task::WithSubtask;
 use base qw(Task::WithSubtask);
-use Globals qw($net %config $char $messageSender $taskManager $accountID %timeout);
+use Globals qw($net %config $char $messageSender $taskManager $accountID %timeout %items_lut);
 use Utils qw(timeOut);
 use Utils::Exceptions;
 
@@ -29,7 +29,9 @@ use AI;
 use Task::UseSkill;
 use Task::ErrorReport;
 
-use Log qw(debug);
+use Log qw(debug error message);
+
+use Translation qw(T TF);
 
 use enum qw(
 	STARTING
@@ -50,6 +52,12 @@ use enum qw(
 	RESPAWN
 );
 
+use enum qw(
+	ERROR_ITEM
+	ERROR_SKILL
+	ERROR_TASK
+);
+
 sub new {
 	my $class = shift;
 	my %args = @_;
@@ -57,12 +65,15 @@ sub new {
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
 	$self->{type} = $args{type};
-	$self->{respawnMap} = $args{respawnMap} || $config{saveMap} || 'prontera';
-	$self->{respawnMap} = $self->{respawnMap}.'.gat';
 	if ($self->{type} == RANDOM) {
 		$self->{useSkill} = $args{useSkill} || $config{teleportAuto_useSkill} || 1;
+		@{$self->{teleport_items}} = (601, 12323);
+		$self->{destMap} = 'Random';
 	} elsif ($self->{type} == RESPAWN) {
 		$self->{useSkill} = $args{useSkill} || !$config{teleportAuto_useItemForRespawn} || 1;
+		@{$self->{teleport_items}} = (602, 12324);
+		$self->{destMap} = $args{destMap} || $config{saveMap} || 'prontera';
+		$self->{destMap} = $self->{destMap}.'.gat';
 	} else {
 		ArgumentException->throw(sprintf("Unknown teleport type value %s.", $self->{type}));
 	}
@@ -113,69 +124,10 @@ sub resume {
 sub iterate {
 	my ($self) = @_;
 	return if (!$self->SUPER::iterate() || $net->getState() != Network::IN_GAME);
-	if ($self->{type} == RANDOM) {
-		teleport_random(@_);
-	} elsif ($self->{type} == RESPAWN) {
-		teleport_respawn(@_);
-	}
-}
-
-sub teleport_respawn {
-	my ($self) = @_;
 	if ($self->{mapChange}) {
 		$self->setDone();
 	} elsif ($self->{state} == GOT_WARP_LIST && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
-		$messageSender->sendWarpTele(26, $self->{respawnMap});
-		$self->{state} = WAITING_FOR_MAPCHANGE;
-	} elsif ($self->{state} == STARTING) {
-		if ($self->{useSkill} && !$char->{muted}) {
-			if ($char->{skills}{AL_TELEPORT}) {
-				$self->{method} = SKILL;
-				$self->{state} = USE_TELEPORT;
-			} else {
-				# TODO: check if something needs to be equipped
-				# fallback to ITEM method
-				$self->{method} = ITEM;
-			}
-		} else {
-			$self->{item} = $char->inventory->getByNameID(602) || $char->inventory->getByNameID(12324);
-			if ($self->{item}) {
-				$self->{method} = ITEM;
-				$self->{state} = USE_TELEPORT;
-			} else {
-				# exit and throw error
-			}
-		}	
-	} elsif ($self->{state} == USE_TELEPORT) {
-		if ($self->{method} == SKILL) {
-			if (!$self->getSubtask() && (!$self->{skillTask})) {
-				my $skill = new Skill(handle => 'AL_TELEPORT', level => 2);
-				my $task = new Task::UseSkill (
-					actor => $skill->getOwner,
-					skill => $skill,
-				);
-				$self->setSubtask($task);
-				$self->{skillTask} = $task;
-			}
-			if (!$self->getSubtask() && !$self->{skillTask}->getError()) {
-				# success
-				$self->{state} = WAITING_FOR_WARPLIST;
-			} elsif (!$self->getSubtask() && $self->{skillTask}->getError()) {
-				undef $self->{skillTask}; # retry
-			}
-		} elsif ($self->{method} == ITEM) {
-			$messageSender->sendItemUse($self->{item}->{index}, $accountID);
-			$self->{state} = WAITING_FOR_MAPCHANGE;
-		}
-	}
-}
-
-sub teleport_random {
-	my ($self) = @_;
-	if ($self->{mapChange}) {
-		$self->setDone();
-	} elsif ($self->{state} == GOT_WARP_LIST && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
-		$messageSender->sendWarpTele(26, "Random");
+		$messageSender->sendWarpTele(26, $self->{destMap});
 		$self->{state} = WAITING_FOR_MAPCHANGE;
 	} elsif ($self->{state} == STARTING) {
 		if ($self->{useSkill} && !$char->{muted}) {
@@ -185,27 +137,43 @@ sub teleport_random {
 			} elsif (!$self->{fallback}) {
 				# TODO: check if something needs to be equipped
 				# fallback to ITEM method
+				error TF("You don't have the Teleport skill, trying to use %s\n", $items_lut{$self->{teleport_items}->[0]}), "teleport";
 				$self->{fallback} = 1;
-				$self->{method} = ITEM;
+				$self->{useSkill} = 0;
+				$self->{state} = STARTING;
 			} else {
-				# fail and throw error
+				# tried item then skill
+				my $msg = TF("Unable to use %s and Teleport skill\n", $items_lut{$self->{teleport_items}->[0]});
+				error $msg;
+				$self->setError(ERROR_ITEM, $msg);
+				# what can we do now? deactivate teleport?
 			}
 		} else {
-			$self->{item} = $char->inventory->getByNameID(601) || $char->inventory->getByNameID(12323);
+			foreach my $itemID (@{$self->{teleport_items}}) {
+				$self->{item} = $char->inventory->getByNameID($itemID);
+				last if $self->{item};
+			}
+			
 			if ($self->{item}) {
 				$self->{method} = ITEM;
 				$self->{state} = USE_TELEPORT;
 			} elsif (!$self->{fallback}) {
 				$self->{fallback} = 1;
-				$self->{method} = SKILL;
+				$self->{useSkill} = 1;
+				$self->{state} = STARTING;
+				error TF("You don't have %ss, trying to use the Teleport Skill\n", $items_lut{$self->{teleport_items}->[0]}), "teleport";
 			} else {
-				# fail and throw error
+				# tried skill then item
+				my $msg = TF("Unable to use Teleport skill and %s \n", $items_lut{$self->{teleport_items}->[0]});
+				error $msg;
+				$self->setError(ERROR_SKILL, $msg);
 			}
 		}	
 	} elsif ($self->{state} == USE_TELEPORT) {
 		if ($self->{method} == SKILL) {
 			if (!$self->getSubtask() && (!$self->{skillTask})) {
-				my $skill = new Skill(handle => 'AL_TELEPORT', level => 1);
+				my $skill = new Skill(handle => 'AL_TELEPORT', level => ($self->{type} == RESPAWN)?$char->{skills}{AL_TELEPORT}{lv}:1); # always use tp level 1 for random dest.
+				message (T("Using Teleport Skill Level 2 though we not have it!\n"), "teleport") if ($char->{skills}{AL_TELEPORT}{lv} == 1 && $self->{type} == RESPAWN);
 				my $task = new Task::UseSkill (
 					actor => $skill->getOwner,
 					skill => $skill,
@@ -215,16 +183,47 @@ sub teleport_random {
 			}
 			if (!$self->getSubtask() && !$self->{skillTask}->getError()) {
 				# success
+				Plugins::callHook('teleport_sent',
+					{
+						level => ($self->{type}+1), # older plugins compatibility
+						type => $self->{type},
+						emergency => $self->{emergency},
+						method => $self->{method}
+					}
+				);
 				$self->{state} = WAITING_FOR_WARPLIST;
 			} elsif (!$self->getSubtask() && $self->{skillTask}->getError()) {
-				undef $self->{skillTask}; # retry
+				if ($self->{skillTask}->getError()->{code} == Task::UseSkill::ERROR_CASTING_FAILED && $self->{skillTask}->{castingError}->{type} == 1) {
+					if (!$self->{fallback}) {
+						$self->{fallback} = 1;
+						$self->{useSkill} = 0;
+						$self->{state} = STARTING;
+						undef $self->{skillTask};
+						error TF("You don't have enough SP to use the Teleport skill, trying to use %s\n", $items_lut{$self->{teleport_items}->[0]}), "teleport";
+					} else {
+						my $msg = T("No enough SP to teleport and no teleport items \n");
+						error $msg;
+						$self->setError(ERROR_TASK, $msg);
+					}
+				} else {
+					undef $self->{skillTask}; # retry
+				}
 			}
 		} elsif ($self->{method} == ITEM) {
 			$messageSender->sendItemUse($self->{item}->{index}, $accountID);
+			Plugins::callHook('teleport_sent',
+				{
+					level => ($self->{type}+1), # older plugins compatibility
+					type => $self->{type},
+					emergency => $self->{emergency},
+					method => $self->{method}
+				}
+			);
 			$self->{state} = WAITING_FOR_MAPCHANGE;
 		}
 	}
 }
+
 
 sub mapChange {
 	my (undef, undef, $holder) = @_;
