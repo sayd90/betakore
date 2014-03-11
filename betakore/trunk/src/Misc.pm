@@ -51,6 +51,7 @@ use Actor::Portal;
 use Actor::Pet;
 use Actor::Slave;
 use Actor::Unknown;
+use Task::Teleport;
 use Time::HiRes qw(time usleep);
 use Translation;
 use Utils::Exceptions;
