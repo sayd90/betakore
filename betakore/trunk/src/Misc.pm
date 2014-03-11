@@ -2923,7 +2923,7 @@ sub updatePlayerNameCache {
 		$playerNameCache{$ID} = \%entry;
 	}
 }
-use Task::Teleport::Random;
+
 ##
 # useTeleport(level)
 # level: 1 to teleport to a random spot, 2 to respawn.
