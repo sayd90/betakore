@@ -580,10 +580,11 @@ sub parsePortals {
 			my ($source_map, $source_x, $source_y, $dest_map, $dest_x, $dest_y, $open_bracket) = ($1, $2, $3, $4, $5, $6, $7);
 			my $portal = "$source_map $source_x $source_y";
 			my $dest = "$dest_map $dest_x $dest_y";
-			if ($$r_hash{$portal}{'dest'}{$dest}) {
-				error "$_ \n";
-				exit;
-			}
+			# Check for duplicated portals
+			# if ($$r_hash{$portal}{'dest'}{$dest}) {
+				# error "$_ \n";
+				# exit;
+			# }
 			$$r_hash{$portal}{'source'}{'map'} = $source_map;
 			$$r_hash{$portal}{'source'}{'x'} = $source_x;
 			$$r_hash{$portal}{'source'}{'y'} = $source_y;
