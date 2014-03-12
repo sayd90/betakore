@@ -21,7 +21,7 @@ use encoding 'utf8';
 use Modules 'register';
 use Task;
 use base qw(Task);
-use Globals qw($char %timeout $npcsList $monstersList %ai_v $messageSender %config @storeList $net %talk);
+use Globals qw($char %timeout $npcsList $monstersList %ai_v $messageSender %config @storeList $net %talk %timeout);
 use Log qw(message debug error);
 use Utils;
 use Commands;
@@ -73,6 +73,7 @@ sub new {
 	$self->{y} = $args{y};
 	$self->{sequence} = $args{sequence};
 	$self->{sequence} =~ s/^ +| +$//g;
+	$self->{response_delay} = $args{response_delay} || $timeout{ai_npc_response}{timeout} || 0.4; # increased to 0.4, 0.25 was too fast
 
 	# Watch for map change events. Pass a weak reference to ourselves in order
 	# to avoid circular references (memory leaks).
@@ -102,7 +103,7 @@ sub iterate {
 	my ($self) = @_;
 	$self->SUPER::iterate(); # Do not forget to call this!
 	return unless ($net->getState() == Network::IN_GAME);
-	my $timeResponse = ($config{npcTimeResponse} >= 5) ? $config{npcTimeResponse}:5;
+	my $timeResponse = (($config{npcTimeResponse} >= 5) ? $config{npcTimeResponse}:5)+$self->{response_delay};
 	
 	if ($self->{stage} eq 'Not Started') {
 		if (!timeOut($char->{time_move}, $char->{time_move_calc} + 0.2)) {
@@ -161,8 +162,8 @@ sub iterate {
 		$messageSender->sendTalkCancel($self->{ID});
 		$self->setError(NPC_NO_RESPONSE, T("The NPC did not respond."));
 
-	} elsif (timeOut($ai_v{npc_talk}{time}, 0.25)) {
-		# 0.25 seconds have passed since we last talked to the NPC.
+	} elsif (timeOut($ai_v{npc_talk}{time}, $self->{response_delay})) {
+		# $timeout{ai_npc_response}{timeout} seconds have passed since we last talked to the NPC.
 
 		if ($ai_v{npc_talk}{talk} eq 'close' && $self->{steps}[0] =~ /x/i) {
 			undef $ai_v{npc_talk}{talk};

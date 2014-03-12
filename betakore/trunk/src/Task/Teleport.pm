@@ -67,7 +67,7 @@ sub new {
 	$self->{type} = $args{type};
 	if ($self->{type} == RANDOM) {
 		$self->{useSkill} = $args{useSkill} || $config{teleportAuto_useSkill} || 1;
-		@{$self->{teleport_items}} = (601, 12323);
+		@{$self->{teleport_items}} = (601, 12323); # TODO: add alternative items for private servers?
 		$self->{destMap} = 'Random';
 	} elsif ($self->{type} == RESPAWN) {
 		$self->{useSkill} = $args{useSkill} || !$config{teleportAuto_useItemForRespawn} || 1;
@@ -207,6 +207,7 @@ sub iterate {
 					}
 				} else {
 					undef $self->{skillTask}; # retry
+					# TODO: other kind of errors?
 				}
 			}
 		} elsif ($self->{method} == ITEM) {
