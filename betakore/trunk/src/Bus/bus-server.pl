@@ -39,7 +39,8 @@ sub __start {
 		"port=i"     => \$options{port},
 		"quiet"      => \$options{quiet},
 		"bind=s"     => \$options{bind},
-		"help"       => \$options{help}
+		"help"       => \$options{help},
+		"nodaemon"       => \$options{nodaemon}
 	)) {
 		usage(1);
 	} elsif ($options{help}) {
@@ -48,7 +49,7 @@ sub __start {
 
 
 	#### Start the server, if not already running. ####
-	if ($options{nodaemon}) {
+	if (!$options{nodaemon}) {
 		my $daemon = new Utils::Daemon("OpenKore-Bus");
 		eval {
 			$daemon->init(\&startServer);
