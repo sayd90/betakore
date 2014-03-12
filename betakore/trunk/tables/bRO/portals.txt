@@ -3364,7 +3364,7 @@ einbroch 55 202 moc_para01 31 14 {
 yuno 144 189 moc_para01 31 14 {
 	steps: c c r0
 }
-lighthalzen 167 102 moc_para01 31 14 {
+lighthalzen 164 86 moc_para01 31 14 {
 	steps: c c r0
 }
 alberta 124 67 moc_para01 31 14 {
