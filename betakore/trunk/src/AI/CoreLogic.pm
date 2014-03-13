@@ -73,7 +73,7 @@ sub iterate {
 	processEscapeUnknownMaps();
 	Benchmark::end("AI (part 1.1)") if DEBUG;
 	Benchmark::begin("AI (part 1.2)") if DEBUG;
-	processDelayedTeleport();
+	$char->processTask("Teleport");
 	$char->processTask("sitting");
 	$char->processTask("standing");
 	AI::Attack::process();
@@ -599,22 +599,6 @@ sub processEscapeUnknownMaps {
 					 attackOnRoute => 2,
 					 noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0) );
 			}
-		}
-	}
-}
-
-##### DELAYED-TELEPORT #####
-sub processDelayedTeleport {
-	if (AI::action eq 'teleport') {
-		if ($timeout{ai_teleport_delay}{time} && timeOut($timeout{ai_teleport_delay})) {
-			# We have already successfully used the Teleport skill,
-			# and the ai_teleport_delay timeout has elapsed
-			$messageSender->sendWarpTele(26, AI::args->{lv} == 2 ? "$config{saveMap}.gat" : "Random");
-			AI::dequeue;
-		} elsif (!$timeout{ai_teleport_delay}{time} && timeOut($timeout{ai_teleport_retry})) {
-			# We are still trying to use the Teleport skill
-			$messageSender->sendSkillUse(26, $char->{skills}{AL_TELEPORT}{lv}, $accountID);
-			$timeout{ai_teleport_retry}{time} = time;
 		}
 	}
 }
