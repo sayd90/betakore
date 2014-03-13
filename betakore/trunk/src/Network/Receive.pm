@@ -4021,14 +4021,23 @@ sub no_teleport {
 	my ($self, $args) = @_;
 	my $fail = $args->{fail};
 
+	my $errorMessage;
 	if ($fail == 0) {
-		error T("Unavailable Area To Teleport\n");
-		AI::clear(qw/teleport/);
+		$errorMessage = T("Unavailable Area To Teleport");
+	#	AI::clear(qw/teleport/);
 	} elsif ($fail == 1) {
-		error T("Unavailable Area To Memo\n");
+		$errorMessage = T("Unavailable Area To Memo");
 	} else {
-		error TF("Unavailable Area To Teleport (fail code %s)\n", $fail);
+		$errorMessage = TF("Unavailable Area To Teleport (fail code %s)", $fail);
 	}
+	
+	error sprintf("%s\n", $errorMessage);
+	
+	Plugins::callHook('packet_no_teleport', {
+		failType    => $fail,
+		failMessage => $errorMessage
+	});
+	
 }
 
 
