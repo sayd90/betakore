@@ -61,7 +61,7 @@ use enum qw(
 sub new {
 	my $class = shift;
 	my %args = @_;
-	my $self = $class->SUPER::new(@_, autostop => 0, autofail => 0, mutexes => ['teleport']);
+	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport']);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
 	$self->{type} = $args{type};
@@ -205,9 +205,11 @@ sub iterate {
 						error $msg;
 						$self->setError(ERROR_TASK, $msg);
 					}
-				} else {
-					undef $self->{skillTask}; # retry
-					# TODO: other kind of errors?
+				} elsif ($self->{skillTask}->getError()->{code} == Task::UseSkill::ERROR_CASTING_FAILED && ($self->{skillTask}->{castingError}->{type} == 512 || $self->{skillTask}->{castingError}->{type} == 513)) {
+					my $msg = T("Can't teleport in this area \n");
+					error $msg;
+					$self->setError(ERROR_TASK, $msg);
+					# TODO: more
 				}
 			}
 		} elsif ($self->{method} == ITEM) {

@@ -160,6 +160,7 @@ sub new {
 		# official servers send lone skill_cast packet
 		['packet/shop_skill' => $workaround_skill_use->('MC_VENDING')],
 		
+		['packet_no_teleport', \&onTeleportFail, \@holder],
 		['packet_skillfail', \&onSkillFail, \@holder],
 		['packet_castCancelled', \&onSkillCancelled, \@holder],
 		['Network::Receive::map_changed', \&onMapChanged, \@holder],
@@ -229,6 +230,18 @@ sub onSkillCancelled {
 	my $self = $holder->[0];
 	if ($self->getStatus() == Task::RUNNING && $self->{actor}{ID} eq $args->{sourceID}) {
 		$self->{castingCancelled} = 1;
+	}
+}
+
+# Called when teleport has failed.
+sub onTeleportFail {
+	my (undef, $args, $holder) = @_;
+	my $self = $holder->[0];
+	if ($self->getStatus() == Task::RUNNING && $self->{skill}->getIDN() == 26) {
+		$self->{castingError} = {
+			type => $args->{failType}+512, # differ from skill_use_failed code
+			message => $args->{failMessage}
+		};
 	}
 }
 

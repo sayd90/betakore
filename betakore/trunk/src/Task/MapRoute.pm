@@ -219,7 +219,7 @@ sub iterate {
 					undef $self->{mapChanged};
 				}
 
-				if (!$self->{sentTeleport}) {
+				if (!$self->getSubtask()) {
 
 					my $dist = new PathFinding(
 						start => $self->{actor}{pos_to},
@@ -232,14 +232,18 @@ sub iterate {
 						if ($dist > 0 && $config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
 							debug "Teleported $config{route_teleport_maxTries} times. Falling back to walking.\n", "route_teleport";
 						} else {
-							message TF("Attempting to teleport near NPC, try #%s\n", ($self->{teleportTries} + 1)), "route_teleport";
-							if (!useTeleport(1)) {
-								$self->{teleport} = 0;
-							} else {
+							if (!$self->getSubtask() && !$self->{skillTask}) {
+								message TF("Attempting to teleport near NPC, try #%s\n", ($self->{teleportTries} + 1)), "route_teleport";
+								my $task = new Task::Teleport(useSkill => 1, type => 0);
 								$walk = 0;
-								$self->{sentTeleport} = 1;
+								$self->setSubtask($task);
+								$self->{skillTask} = $task;
+							}
+							if (!$self->getSubtask() && !$self->{skillTask}->getError()) {
+								$walk = 0;
 								$self->{teleportTime} = time;
 								$self->{teleportTries}++;
+								undef $self->{skillTask};
 							}
 						}
 					}
@@ -340,11 +344,10 @@ sub iterate {
 				my $minDist = $config{route_teleport_minDistance};
 
 				if ($self->{mapChanged}) {
-					undef $self->{sentTeleport};
 					undef $self->{mapChanged};
 				}
 
-				if (!$self->{sentTeleport}) {
+				if (!$self->getSubtask()) {
 					# Find first inter-map portal
 					my $portal;
 					for my $x (@{$self->{mapSolution}}) {
@@ -363,14 +366,18 @@ sub iterate {
 						if ($dist > 0 && $config{route_teleport_maxTries} && $self->{teleportTries} >= $config{route_teleport_maxTries}) {
 							debug "Teleported $config{route_teleport_maxTries} times. Falling back to walking.\n", "route_teleport";
 						} else {
-							message TF("Attempting to teleport near portal, try #%s\n", ($self->{teleportTries} + 1)), "route_teleport";
-							if (!useTeleport(1)) {
-								$self->{teleport} = 0;
-							} else {
+							if (!$self->getSubtask() && !$self->{skillTask}) {
+								message TF("Attempting to teleport near portal, try #%s\n", ($self->{teleportTries} + 1)), "route_teleport";
+								my $task = new Task::Teleport(useSkill => 1, type => 0);
 								$walk = 0;
-								$self->{sentTeleport} = 1;
+								$self->setSubtask($task);
+								$self->{skillTask} = $task;
+							}
+							if (!$self->getSubtask() && !$self->{skillTask}->getError()) {
+								$walk = 0;
 								$self->{teleportTime} = time;
 								$self->{teleportTries}++;
+								undef $self->{skillTask};
 							}
 						}
 					}
@@ -396,12 +403,16 @@ sub iterate {
 							new Task::Function(function => sub {
 								my ($function) = @_;
 								if (!$self->{textHook}) {
-								$self->{textHook} = Plugins::addHook('packet_localBroadcast' => sub {
+									$self->{textHook} = Plugins::addHook('packet_localBroadcast' => sub {
 									if ($_[1]{Msg} =~ /$self->{mapSolution}[0]{activation_text}/) {
 										$function->setDone;
-										Plugins::delHook($self->{textHook}) if $self->{textHook};
 									}
 								})};
+							}),
+							new Task::Function(function => sub {
+								Plugins::delHook($self->{textHook}) if $self->{textHook};
+								undef $self->{textHook};
+								$_[0]->setDone;
 							}),
 							new Task::Route(
 								actor => $self->{actor},
@@ -526,7 +537,9 @@ sub subtaskDone {
 			}
 			$self->setError($code, $error->{message});
 		}
-
+	} elsif ($task->isa('Task::Teleport')) {
+		$self->{teleport} = 0;
+		undef $self->{skillTask} if $self->{skillTask};
 	} elsif (my $error = $task->getError()) {
 		$self->setError(UNKNOWN_ERROR, $error->{message});
 	}
