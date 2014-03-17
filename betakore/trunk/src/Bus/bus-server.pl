@@ -49,8 +49,8 @@ sub __start {
 
 
 	#### Start the server, if not already running. ####
+	my $daemon = new Utils::Daemon("OpenKore-Bus");
 	if (!$options{nodaemon}) {
-		my $daemon = new Utils::Daemon("OpenKore-Bus");
 		eval {
 			$daemon->init(\&startServer);
 		};
