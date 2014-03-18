@@ -64,9 +64,16 @@ sub new {
 	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport']);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
+	$self->{giveup}{timeout} = $args{giveup_time} || 5;
 	$self->{type} = $args{type};
 	if ($self->{type} == RANDOM) {
-		$self->{useSkill} = $args{useSkill} || $config{teleportAuto_useSkill} || 1;
+		if (defined $args{useSkill}) {
+			$self->{useSkill} = $args{useSkill};
+		} elsif (defined $config{teleportAuto_useSkill}) {
+			$self->{useSkill} = $config{teleportAuto_useSkill};
+		} else {
+			$self->{useSkill} = 1;
+		}
 		@{$self->{teleport_items}} = (601, 12323); # TODO: add alternative items for private servers?
 		$self->{destMap} = 'Random';
 	} elsif ($self->{type} == RESPAWN) {
@@ -78,8 +85,7 @@ sub new {
 		ArgumentException->throw(sprintf("Unknown teleport type value %s.", $self->{type}));
 	}
 	
-	$self->{emergency} = $args{emergency};
-	
+	$self->{startTime} = time;
 	
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
@@ -96,7 +102,7 @@ sub warpPortalList {
 	my $self = $holder->[0];
 	$timeout{ai_teleport_delay}{time} = time;
 	$self->{state} = GOT_WARP_LIST;
-	$self->{portal_list} = 1
+	$char->{warpListOpen} = 1;
 }
 
 sub DESTROY {
@@ -123,13 +129,20 @@ sub resume {
 
 sub iterate {
 	my ($self) = @_;
-	return if (!$self->SUPER::iterate() || $net->getState() != Network::IN_GAME);
-	if ($self->{mapChange}) {
+	return if (!$self->SUPER::iterate());
+	if ($self->{mapChange} || $net->getState() != Network::IN_GAME) {
 		$self->setDone();
-	} elsif ($self->{state} == GOT_WARP_LIST && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
+		$char->{warpListOpen} = 0;
+		debug sprintf("Took %s seconds to teleport \n", (time - $self->{startTime})), "Task::Teleport";
+	# } elsif (timeOut($self->{giveup}) && $self->{state} != STARTING) {
+		# $self->setError(ERROR_TASK, "Task::Teleport timeout", $self->{actor});
+	} elsif ($char->{warpListOpen} && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
 		$messageSender->sendWarpTele(26, $self->{destMap});
+		$char->{warpListOpen} = 0;
 		$self->{state} = WAITING_FOR_MAPCHANGE;
+		return;
 	} elsif ($self->{state} == STARTING) {
+		$self->{giveup}{time} = time;
 		if ($self->{useSkill} && !$char->{muted}) {
 			if ($char->{skills}{AL_TELEPORT}) {
 				$self->{method} = SKILL;
@@ -153,7 +166,6 @@ sub iterate {
 				$self->{item} = $char->inventory->getByNameID($itemID);
 				last if $self->{item};
 			}
-			
 			if ($self->{item}) {
 				$self->{method} = ITEM;
 				$self->{state} = USE_TELEPORT;
@@ -168,10 +180,12 @@ sub iterate {
 				error $msg;
 				$self->setError(ERROR_SKILL, $msg);
 			}
-		}	
+		}
+		$self->iterate();
 	} elsif ($self->{state} == USE_TELEPORT) {
 		if ($self->{method} == SKILL) {
-			if (!$self->getSubtask() && (!$self->{skillTask})) {
+			if (!$self->getSubtask()) {
+				message "Creating skill task \n";
 				my $skill = new Skill(handle => 'AL_TELEPORT', level => ($self->{type} == RESPAWN)?$char->{skills}{AL_TELEPORT}{lv}:1); # always use tp level 1 for random dest.
 				message (T("Using Teleport Skill Level 2 though we not have it!\n"), "teleport") if ($char->{skills}{AL_TELEPORT}{lv} == 1 && $self->{type} == RESPAWN);
 				my $task = new Task::UseSkill (
@@ -181,7 +195,11 @@ sub iterate {
 				$self->setSubtask($task);
 				$self->{skillTask} = $task;
 			}
+			
+			$self->SUPER::iterate(); # Iterate preparation subtask
+			
 			if (!$self->getSubtask() && !$self->{skillTask}->getError()) {
+				message "Skill task sucess \n";
 				# success
 				Plugins::callHook('teleport_sent',
 					{
@@ -193,6 +211,7 @@ sub iterate {
 				);
 				$self->{state} = WAITING_FOR_WARPLIST;
 			} elsif (!$self->getSubtask() && $self->{skillTask}->getError()) {
+				
 				if ($self->{skillTask}->getError()->{code} == Task::UseSkill::ERROR_CASTING_FAILED && $self->{skillTask}->{castingError}->{type} == 1) {
 					if (!$self->{fallback}) {
 						$self->{fallback} = 1;
@@ -209,6 +228,15 @@ sub iterate {
 					my $msg = T("Can't teleport in this area \n");
 					error $msg;
 					$self->setError(ERROR_TASK, $msg);
+				} elsif ($self->{skillTask}->getError()->{code} == Task::UseSkill::ERROR_MAX_TRIES) {
+					my $msg = $self->{skillTask}->getError()->{message}."\n";
+					error $msg;
+					$self->setError(ERROR_TASK, $msg);
+				} elsif ($self->{skillTask}->getError()) {
+					my $msg = "Untreated error: ".$self->{skillTask}->getError()->{message}."\n";
+					error $msg;
+					$self->setError(ERROR_TASK, $msg);
+					die;
 					# TODO: more
 				}
 			}
