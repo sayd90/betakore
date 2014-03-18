@@ -232,6 +232,10 @@ sub iterate {
 					my $msg = $self->{skillTask}->getError()->{message}."\n";
 					error $msg;
 					$self->setError(ERROR_TASK, $msg);
+				} elsif ($self->{skillTask}->getError()->{code} == Task::UseSkill::ERROR_NO_SKILL) {
+					my $msg = T("We had Teleport skill earlier but now we don't\n");
+					error $msg;
+					$self->setError(ERROR_TASK, $msg);
 				} elsif ($self->{skillTask}->getError()) {
 					my $msg = "Untreated error: ".$self->{skillTask}->getError()->{message}."\n";
 					error $msg;
