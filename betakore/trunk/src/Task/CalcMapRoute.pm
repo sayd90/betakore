@@ -223,7 +223,7 @@ sub searchStep {
 			# MOVE this entry into the CLOSELIST
 			$closelist->{$parent}{walk}   = $openlist->{$parent}{walk};
 			$closelist->{$parent}{parent} = $openlist->{$parent}{parent};
-			$closelist->{$parent}{cost}  = $openlist->{$parent}{cost};
+			$closelist->{$parent}{cost}  = ($char->inventory->getByNameID(7060) && $openlist->{$parent}{ticket})?0:$openlist->{$parent}{cost};
 			delete $openlist->{$parent};
 		}
 
