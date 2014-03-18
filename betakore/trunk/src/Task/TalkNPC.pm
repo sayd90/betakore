@@ -208,8 +208,9 @@ sub iterate {
 				$self->cancelTalk();
 			}
 
-		} elsif ( $step !~ /^c$/i && $ai_v{npc_talk}{talk} eq 'next' && !$config{autoTalkCont}) {
+		} elsif ( $step !~ /^c$/i && $npcTalkType eq 'next' && !$config{autoTalkCont}) {
 			debug "Auto-continuing NPC Talk - next detected \n", 'ai_npcTalk';
+			
 			$messageSender->sendTalkContinue($talk{ID});
 			return;
 		} elsif ( $step =~ /^t=(.*)/i ) {
