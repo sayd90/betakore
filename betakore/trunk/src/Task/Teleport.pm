@@ -140,7 +140,6 @@ sub iterate {
 		$messageSender->sendWarpTele(26, $self->{destMap});
 		$char->{warpListOpen} = 0;
 		$self->{state} = WAITING_FOR_MAPCHANGE;
-		return;
 	} elsif ($self->{state} == STARTING) {
 		$self->{giveup}{time} = time;
 		if ($self->{useSkill} && !$char->{muted}) {
@@ -181,7 +180,6 @@ sub iterate {
 				$self->setError(ERROR_SKILL, $msg);
 			}
 		}
-		$self->iterate();
 	} elsif ($self->{state} == USE_TELEPORT) {
 		if ($self->{method} == SKILL) {
 			if (!$self->getSubtask()) {
