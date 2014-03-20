@@ -2224,8 +2224,14 @@ sub processNameRequestQueue {
 }
 
 sub quit {
-	$quit = 1;
-	message T("Exiting...\n"), "system";
+	if ($config{onQuit} == 1) {
+		# disconnect instead of quitting
+		offlineMode();
+	} else {
+		# default behaviour
+		$quit = 1;
+		message T("Exiting...\n"), "system";
+	}
 }
 
 sub offlineMode {
