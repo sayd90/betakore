@@ -157,7 +157,7 @@ sub new {
 		'00F6' => ['storage_item_removed', 'v V', [qw(index amount)]], # 8
 		'00F8' => ['storage_closed'], # 2
 		'00FA' => ['party_organize_result', 'C', [qw(fail)]], # 3
-		'00FB' => ['party_users_info', 'v Z*', [qw(len party_name)]], # -1
+		'00FB' => ['party_users_info', 'x2 Z24', [qw(party_name)]], # -1
 		'00FD' => ['party_invite_result', 'Z24 C', [qw(name type)]], # 27
 		'00FE' => ['party_invite', 'a4 Z24', [qw(ID name)]], # 30
 		'0101' => ['party_exp', 'V', [qw(type)]], # 6
@@ -1390,36 +1390,6 @@ sub party_join {
 	if ($config{partyAutoShare} && $char->{party} && $char->{party}{users}{$accountID}{admin}) {
 		$messageSender->sendPartyOption(1, 0);
 	}
-}
-
-# TODO: TEST optimized unpacking
-sub party_users_info {
-	my ($self, $args) = @_;
-	return unless changeToInGameState();
-
-	my $msg;
-	$self->decrypt(\$msg, substr($args->{RAW_MSG}, 28));
-	$msg = substr($args->{RAW_MSG}, 0, 28).$msg;
-	$char->{party}{name} = bytesToString($args->{party_name});
-
-	for (my $i = 28; $i < $args->{RAW_MSG_SIZE}; $i += 46) {
-		my ($ID, $name, $map, $admin, $online) = unpack 'a4 Z24 Z16 C2', substr $msg, $i, 46;
-		if (binFind(\@partyUsersID, $ID) eq "") {
-			binAdd(\@partyUsersID, $ID);
-		}
-		$char->{party}{users}{$ID} = new Actor::Party();
-		$char->{party}{users}{$ID}{name} = bytesToString($name); #bytesToString(unpack("Z24", substr($msg, $i + 4, 24)));
-		message TF("Party Member: %s\n", $char->{party}{users}{$ID}{name}), "party", 1;
-		$char->{party}{users}{$ID}{map} = $map; #unpack("Z16", substr($msg, $i + 28, 16));
-		$char->{party}{users}{$ID}{admin} = !$admin; #!(unpack("C1", substr($msg, $i + 44, 1)));
-		$char->{party}{users}{$ID}{online} = !$online; #!(unpack("C1",substr($msg, $i + 45, 1)));
-		$char->{party}{users}{$ID}->{ID} = $ID;
-	}
-
-	if ($config{partyAutoShare} && $char->{party} && %{$char->{party}}) {
-		$messageSender->sendPartyOption(1, 0);
-	}
-
 }
 
 sub public_chat {
