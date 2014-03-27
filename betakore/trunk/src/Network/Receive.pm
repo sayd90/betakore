@@ -2560,8 +2560,7 @@ sub login_error {
 	} elsif ($args->{type} == ACCEPT_ID_PASSWD) {
 		error T("The server has denied your connection.\n"), "connection";
 	} elsif ($args->{type} == REFUSE_NOT_CONFIRMED) {
-		$interface->errorDialog(T("Critical Error: Your account has been blocked."));
-		$quit = 1 unless ($net->clientAlive());
+		error T("Server unavailable.\n"), "connection";
 	} elsif ($args->{type} == REFUSE_INVALID_VERSION) {
 		my $master = $masterServer;
 		error TF("Connect failed, something is wrong with the login settings:\n" .
