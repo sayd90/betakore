@@ -1440,7 +1440,12 @@ sub inventory_item_added {
 	} elsif ($fail == 1) {
 		message T("Cannot pickup item (you're Frozen?)\n"), "drop";
 	} else {
-		message TF("Cannot pickup item (failure code %d)\n", $fail), "drop";
+		if ($storage{opened} && $config{dcOnStorageMaxItems}) {
+			message "You've reached the limit of this item in your storage.\n";
+			quit();
+		} else {
+			message TF("Cannot pickup item (failure code %d)\n", $fail), "drop";
+		}
 	}
 }
 

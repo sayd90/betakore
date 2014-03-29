@@ -143,6 +143,7 @@ dcOnMute 0
 dcOnPM 0
 dcOnZeny 0
 dcOnStorageFull 1
+dcOnStorageMaxItems 1
 dcOnPlayer 0
 dcOnServerShutDown 0
 dcOnServerClose 0

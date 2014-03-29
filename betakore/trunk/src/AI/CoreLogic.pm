@@ -1230,12 +1230,15 @@ sub processAutoStorage {
 
 				# inventory to storage
 				$args->{nextItem} = 0 unless $args->{nextItem};
+				our $lastItemId;
 				for (my $i = $args->{nextItem}; $i < @{$char->inventory->getItems()}; $i++) {
 					my $item = $char->inventory->getItems()->[$i];
 					next if $item->{equipped};
 					next if ($item->{broken} && $item->{type} == 7); # dont store pet egg in use
-
+					next if $lastItemId == $item->{nameID}; # We cannot store this item
+					
 					my $control = items_control($item->{name});
+					$lastItemId = $item->{nameID};
 
 					debug "AUTOSTORAGE: $item->{name} x $item->{amount} - store = $control->{storage}, keep = $control->{keep}\n", "storage";
 					if ($control->{storage} && $item->{amount} > $control->{keep}) {
