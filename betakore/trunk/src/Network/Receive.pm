@@ -2873,18 +2873,15 @@ sub npc_sell_list {
 	}
 	
 	debug T("You can sell:\n"), "info";
+	open ('F', '>:utf8', 'tables/sellable.txt');
 	for (my $i = 0; $i < length($args->{itemsdata}); $i += 10) {
 		my ($index, $price, $price_overcharge) = unpack("v L L", substr($args->{itemsdata},$i,($i + 10)));
 		my $item = $char->inventory->getByServerIndex($index);
-		$item->{sellable} = 1; # flag this item as sellable
+		$item->{sellable} = 1; # flag this item as sellable		
+		print F $item->{nameID} ."\n"; # So we can recover later when we go through a portal
 		debug TF("[%s x %s] for %sz each. \n", $item->{amount}, $item->{name}, $price_overcharge), "info";
 	}
-	
-	# FIXME: http://forums.openkore.com/viewtopic.php?f=36&t=18076#p238614
-	foreach my $item (@{$char->inventory->getItems()}) {
-		next if ($item->{equipped} || $item->{sellable});
-		$item->{unsellable} = 1; # flag this item as unsellable
-	}
+	close (F);
 	
 	undef $talk{buyOrSell};
 	message T("Ready to start selling items\n");
