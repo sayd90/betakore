@@ -3813,7 +3813,7 @@ sub checkSelfCondition {
 		}
 	}
 
-	if ($config{$prefix."_homunculus"} =~ /\S/) {
+	if ($config{$prefix."_homunculus"} =~ /^\S$/) {
 		return 0 if (!!$config{$prefix."_homunculus"}) ^ ($char->{homunculus} && !$char->{homunculus}{state});
 	}
 
@@ -3843,7 +3843,7 @@ sub checkSelfCondition {
 		}
 	}
 
-	if ($config{$prefix."_mercenary"} =~ /\S/) {
+	if ($config{$prefix."_mercenary"} =~ /^\S$/) {
 		return 0 if (!!$config{$prefix."_mercenary"}) ^ (!!$char->{mercenary});
 	}
 
