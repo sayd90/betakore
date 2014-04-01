@@ -69,6 +69,7 @@ our @EXPORT = qw(
 	writePortalsLOS
 	writeSectionedFileIntact
 	updateMonsterLUT
+	updateItemsSellTable
 	updatePortalLUT
 	updateNPCLUT
 );
@@ -1319,6 +1320,15 @@ sub updateMonsterLUT {
 	my $name = shift;
 	open FILE, ">>:utf8", $file;
 	print FILE "$ID $name\n";
+	close FILE;
+}
+
+sub updateItemsSellTable {
+	my $file = shift;
+	my $ID = shift;
+	my $flag = shift;
+	open FILE, ">>:utf8", $file;
+	print FILE "$ID $flag\n";
 	close FILE;
 }
 

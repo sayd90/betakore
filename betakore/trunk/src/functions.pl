@@ -232,6 +232,8 @@ sub loadDataFiles {
 		loader => [\&parseDataFile2, \%monsters_lut]);
 	Settings::addTableFile('npcs.txt',
 		loader => [\&parseNPCs, \%npcs_lut]);
+	Settings::addTableFile('itemssellable.txt',
+		loader => [\&parseDataFile2, \%items_sellable]);
 	Settings::addTableFile('packetdescriptions.txt',
 		loader => [\&parseSectionedFile, \%packetDescriptions], mustExist => 0);
 	Settings::addTableFile('portals.txt',
@@ -343,8 +345,8 @@ sub initNetworking {
 		require Bus::Handlers;
 		my $host = $sys{bus_server_host};
 		my $port = $sys{bus_server_port};
-		$host = undef if ($host eq '');
-		$port = undef if ($port eq '');
+		$host = undef if ($host eq '' || $ENV{NOBUS});
+		$port = undef if ($port eq '' || $ENV{NOBUS});
 		$bus = new Bus::Client(host => $host, port => $port);
 		our $busMessageHandler = new Bus::Handlers($bus);
 	}

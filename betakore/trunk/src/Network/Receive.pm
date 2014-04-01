@@ -31,7 +31,7 @@ use AI;
 use Globals;
 #use Settings;
 use Log qw(message warning error debug);
-use FileParsers qw(updateMonsterLUT updateNPCLUT);
+use FileParsers qw(updateMonsterLUT updateNPCLUT updateItemsSellTable);
 use I18N qw(bytesToString stringToBytes);
 use Interface;
 use Network;
@@ -2873,15 +2873,26 @@ sub npc_sell_list {
 	}
 	
 	debug T("You can sell:\n"), "info";
-	open ('F', '>:utf8', 'tables/sellable.txt');
 	for (my $i = 0; $i < length($args->{itemsdata}); $i += 10) {
 		my ($index, $price, $price_overcharge) = unpack("v L L", substr($args->{itemsdata},$i,($i + 10)));
 		my $item = $char->inventory->getByServerIndex($index);
-		$item->{sellable} = 1; # flag this item as sellable		
-		print F $item->{nameID} ."\n"; # So we can recover later when we go through a portal
+		# flag this item as sellable
+		unless (exists $items_sellable{$item->{nameID}}) {
+			$items_sellable{$item->{nameID}} = 1;
+			updateItemsSellTable(Settings::getTableFilename("itemssellable.txt"), $item->{nameID}, 1);
+		}
 		debug TF("[%s x %s] for %sz each. \n", $item->{amount}, $item->{name}, $price_overcharge), "info";
 	}
-	close (F);
+	
+	# FIXME: http://forums.openkore.com/viewtopic.php?f=36&t=18076#p238614
+	foreach my $item (@{$char->inventory->getItems()}) {
+		next if ($item->{equipped} || $items_sellable{$item->{nameID}});
+		# flag this item as unsellable
+		unless (exists $items_sellable{$item->{nameID}}) {
+			$items_sellable{$item->{nameID}} = 0;
+			updateItemsSellTable(Settings::getTableFilename("itemssellable.txt"), $item->{nameID}, 0);
+		}
+	}
 	
 	undef $talk{buyOrSell};
 	message T("Ready to start selling items\n");
@@ -3307,6 +3318,20 @@ sub forge_list {
 		#my $charID = substr($args->{RAW_MSG}, $i+4, 4);
 	}
 	message "=========================\n";
+	if ($config{autoCreate}) {
+		# todo: implement extra items
+		# todo: check if item is available
+		my $item = $config{autoCreate};
+		if ($item !~ /^\d+$/) {
+			# transform itemName into itemID
+			$item = itemNameToID($item);
+			if (!$item) {
+				error TF("Invalid item in autoCreate config key \n");
+				return;
+			}
+		}
+		$messageSender->sendProduceMix($item, 0, 0, 0);
+	}
 }
 
 sub friend_list {

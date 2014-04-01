@@ -483,12 +483,8 @@ sub ai_route { $char->route(@_) }
 
 #sellAuto for items_control - chobit andy 20030210
 sub ai_sellAutoCheck {
-	local $/ = undef;
-	open ('F', '<', 'tables/sellable.txt');
-	my $sellable_items = <F>;
-	close (F);
 	foreach my $item (@{$char->inventory->getItems()}) {
-		next if ($sellable_items !~ $item->{nameID} || $item->{equipped});
+		next if (($items_sellable{$item->{nameID}} == 0) || $item->{equipped});
 		my $control = Misc::items_control($item->{name});
 		if ($control->{sell} && $item->{amount} > $control->{keep}) {
 			return 1;

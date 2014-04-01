@@ -1492,7 +1492,7 @@ sub processAutoSell {
 			my @sellItems;
 			foreach my $item (@{$char->inventory->getItems()}) {
 				next if ($item->{equipped});
-				next if (!$item->{sellable});
+				next if ($items_sellable{$item->{nameID}} == 0);
 
 				my $control = items_control($item->{name});
 
