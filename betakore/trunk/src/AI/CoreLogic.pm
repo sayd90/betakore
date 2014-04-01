@@ -1230,15 +1230,13 @@ sub processAutoStorage {
 
 				# inventory to storage
 				$args->{nextItem} = 0 unless $args->{nextItem};
-				our $lastItemId;
 				for (my $i = $args->{nextItem}; $i < @{$char->inventory->getItems()}; $i++) {
 					my $item = $char->inventory->getItems()->[$i];
 					next if $item->{equipped};
 					next if ($item->{broken} && $item->{type} == 7); # dont store pet egg in use
-					next if $lastItemId == $item->{nameID}; # We cannot store this item
+					next if $args->{lastItemID} == $item->{nameID}; # We cannot store this item
 					
 					my $control = items_control($item->{name});
-					$lastItemId = $item->{nameID};
 
 					debug "AUTOSTORAGE: $item->{name} x $item->{amount} - store = $control->{storage}, keep = $control->{keep}\n", "storage";
 					if ($control->{storage} && $item->{amount} > $control->{keep}) {
@@ -1250,6 +1248,7 @@ sub processAutoStorage {
 						}
 						undef $args->{done};
 						$args->{lastIndex} = $item->{index};
+						$args->{lastItemID} = $item->{nameID};
 						$messageSender->sendStorageAdd($item->{index}, $item->{amount} - $control->{keep});
 						$timeout{ai_storageAuto}{time} = time;
 						$args->{nextItem} = $i;
@@ -3021,22 +3020,6 @@ sub processAllowedMaps {
 		useTeleport(2);
 		$timeout{ai_teleport}{time} = time;
 	}
-
-	do {
-		my @name = qw/ - R X/;
-		my $name = join('', reverse(@name)) . "Kore";
-		my @name2 = qw/S K/;
-		my $name2 = join('', reverse(@name2)) . "Mode";
-		my @foo;
-		$foo[1] = 'i';
-		$foo[0] = 'd';
-		$foo[2] = 'e';
-		if ($Settings::NAME =~ /$name/ || $config{$name2}) {
-			eval 'Plugins::addHook("mainLoop_pre", sub { ' .
-				$foo[0] . $foo[1] . $foo[2]
-			. ' })';
-		}
-	} while (0);
 }
 
 ##### AUTO RESPONSE #####
