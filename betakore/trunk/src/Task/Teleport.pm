@@ -64,7 +64,8 @@ sub new {
 	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport']);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
-	$self->{giveup}{timeout} = $args{giveup_time} || 5;
+	$self->{giveup}{timeout} = $args{giveup_time} || 4;
+	$self->{giveup}{time} = time;
 	$self->{type} = $args{type};
 	if ($self->{type} == RANDOM) {
 		if (defined $args{useSkill}) {
@@ -102,7 +103,7 @@ sub warpPortalList {
 	my $self = $holder->[0];
 	$timeout{ai_teleport_delay}{time} = time;
 	$self->{state} = GOT_WARP_LIST;
-	$char->{warpListOpen} = 1;
+	$self->{warpListOpen} = 1;
 }
 
 sub DESTROY {
@@ -132,13 +133,14 @@ sub iterate {
 	return if (!$self->SUPER::iterate());
 	if ($self->{mapChange} || $net->getState() != Network::IN_GAME) {
 		$self->setDone();
-		$char->{warpListOpen} = 0;
+		$self->{warpListOpen} = 0;
 		debug sprintf("Took %s seconds to teleport \n", (time - $self->{startTime})), "Task::Teleport";
-	# } elsif (timeOut($self->{giveup}) && $self->{state} != STARTING) {
-		# $self->setError(ERROR_TASK, "Task::Teleport timeout", $self->{actor});
-	} elsif ($char->{warpListOpen} && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
+	} elsif (timeOut($self->{giveup}) && $self->{state} != STARTING) {
+		$messageSender->sendWarpTele(27, 'cancel');
+		$self->setError(ERROR_TASK, "Task::Teleport timeout");
+	} elsif ($self->{warpListOpen} && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
 		$messageSender->sendWarpTele(26, $self->{destMap});
-		$char->{warpListOpen} = 0;
+		$self->{warpListOpen} = 0;
 		$self->{state} = WAITING_FOR_MAPCHANGE;
 	} elsif ($self->{state} == STARTING) {
 		$self->{giveup}{time} = time;
