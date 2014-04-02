@@ -562,7 +562,7 @@ sub ai_storageAutoCheck {
 	foreach my $item (@{$char->inventory->getItems()}) {
 		next if ($item->{equipped});
 		my $control = Misc::items_control($item->{name});
-		if ($control->{storage} && $item->{amount} > $control->{keep}) {
+		if ($control->{storage} && $item->{amount} > $control->{keep} || !$item->{unstorageable}) {
 			return 1;
 		}
 	}

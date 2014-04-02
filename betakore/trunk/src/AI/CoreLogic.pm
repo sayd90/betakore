@@ -1234,7 +1234,11 @@ sub processAutoStorage {
 					my $item = $char->inventory->getItems()->[$i];
 					next if $item->{equipped};
 					next if ($item->{broken} && $item->{type} == 7); # dont store pet egg in use
-					next if $args->{lastItemID} == $item->{nameID}; # We cannot store this item
+					if $args->{lastItemID} == $item->{nameID} {
+						# We cannot store this item
+						$item->{unstorageable} = 1; # this will be reset once we change maps. We do this to prevent "storage full" error from triggering
+						next;
+					}
 					
 					my $control = items_control($item->{name});
 
