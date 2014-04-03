@@ -2327,8 +2327,8 @@ sub processAutoCommandUse {
 
 ##### AUTO-ITEM USE #####
 sub processAutoItemUse {
-	if ((AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use)))
-	  && timeOut($timeout{ai_item_use_auto})) {
+	if (timeOut($timeout{ai_item_use_auto}) &&
+		(AI::isIdle || AI::is(qw(route mapRoute follow sitAuto take items_gather items_take attack skill_use)))) {
 		my $i = 0;
 		while (exists $config{"useSelf_item_$i"}) {
 			if ($config{"useSelf_item_${i}_timeout"} eq "") {$config{"useSelf_item_${i}_timeout"} = 0;}
