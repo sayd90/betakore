@@ -1236,8 +1236,13 @@ sub processAutoStorage {
 					next if ($item->{broken} && $item->{type} == 7); # dont store pet egg in use
 					if ($args->{lastItemID} == $item->{nameID}) {
 						# We cannot store this item
-						$item->{unstorageable} = 1; # this will be reset once we change maps. We do this to prevent "storage full" error from triggering
-						next;
+						$args->{retry}++;
+						if ($args->{retry} >= 2) {
+							$item->{unstorageable} = 1; # this will be reset once we change maps. We do this to prevent "storage full" error from triggering
+							next;
+						}
+					} else {
+						$args->{retry} = 0;
 					}
 					
 					my $control = items_control($item->{name});
