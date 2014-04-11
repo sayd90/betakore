@@ -35,6 +35,8 @@ use I18N;
 use Utils::Benchmark;
 use Utils::HttpReader;
 
+use Events;
+
 
 #######################################
 # PROGRAM INITIALIZATION
@@ -529,6 +531,7 @@ sub finalInitialization {
 	initUserSeed();
 	initConfChange();
 	Log::initLogFiles();
+	$eventsManager = new Events();
 	$timeout{'injectSync'}{'time'} = time;
 
 	Log::message("\n");
