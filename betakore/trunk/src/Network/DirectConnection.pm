@@ -252,6 +252,7 @@ sub getState {
 sub setState {
 	my ($self, $state) = @_;
 	$conState = $state;
+	$self->{conRetries} = 0;
 	Plugins::callHook('Network::stateChanged');
 }
 
@@ -563,6 +564,12 @@ sub checkConnection {
 			$timeout{'charlogin'}{'time'} = time;
 
 		} elsif (timeOut($timeout{'charlogin'}) && $config{'char'} ne "") {
+			unless ($self->{conRetries}) {
+				error T("Error while connecting, retrying...\n"), "connection";
+				$self->{conRetries}++;
+				undef $conState_tries;
+				return;
+			}
 			error T("Timeout on Character Select Server, reconnecting...\n"), "connection";
 			$timeout_ex{'master'}{'time'} = time;
 			$timeout_ex{'master'}{'timeout'} = $timeout{'reconnect'}{'timeout'};
@@ -602,6 +609,12 @@ sub checkConnection {
 			$timeout{maplogin}{time} = time;
 
 		} elsif (timeOut($timeout{maplogin})) {
+			unless ($self->{conRetries}) {
+				error T("Error while connecting, retrying...\n"), "connection";
+				$self->{conRetries}++;
+				undef $conState_tries;
+				return;
+			}
 			message T("Timeout on Map Server, connecting to Account Server...\n"), "connection";
 			$timeout_ex{master}{timeout} = $timeout{reconnect}{timeout};
 			$self->serverDisconnect;
