@@ -87,6 +87,7 @@ sub new {
 	}
 	
 	$self->{startTime} = time;
+	$timeout{'ai_send_warp_tele_retry'}{'timeout'} = 0.3;
 	
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
@@ -101,7 +102,7 @@ sub new {
 sub warpPortalList {
 	my (undef, undef, $holder) = @_;
 	my $self = $holder->[0];
-	$timeout{ai_teleport_delay}{time} = time;
+	$timeout{'ai_teleport_delay'}{'time'} = time;
 	$self->{state} = GOT_WARP_LIST;
 	$self->{warpListOpen} = 1;
 }
@@ -138,10 +139,13 @@ sub iterate {
 	} elsif (timeOut($self->{giveup}) && $self->{state} != STARTING) {
 		$messageSender->sendWarpTele(27, 'cancel');
 		$self->setError(ERROR_TASK, "Task::Teleport timeout");
-	} elsif ($self->{warpListOpen} && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
+	} elsif ($self->{warpListOpen} && timeOut($timeout{ai_send_warp_tele_retry}) && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
+		$self->{debugRetry}++;
+		debug sprintf("Trying to confirm teleport: attempt %s\n", $self->{debugRetry}), "Task::Teleport";
+		$timeout{ai_send_warp_tele_retry}{time} = time;
 		$messageSender->sendWarpTele(26, $self->{destMap});
 		$self->{warpListOpen} = 0;
-		$self->{state} = WAITING_FOR_MAPCHANGE;
+		#$self->{state} = WAITING_FOR_MAPCHANGE;
 	} elsif ($self->{state} == STARTING) {
 		$self->{giveup}{time} = time;
 		if ($self->{useSkill} && !$char->{muted}) {
