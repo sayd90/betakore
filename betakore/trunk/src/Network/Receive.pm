@@ -4128,6 +4128,8 @@ sub sense_result {
 			$args->{spirit}, $args->{undead}), "list";
 }
 
+# Your shop has sold an item
+# Need a hook.
 sub shop_sold {
 	my ($self, $args) = @_;
 
@@ -4424,6 +4426,10 @@ sub skill_use_failed {
 	});
 }
 
+
+# Skill used on a set of map tile coordinates.
+# Examples: Warp Portal/Teleport, Bard/Dancer skills, etc.
+#
 sub skill_use_location {
 	my ($self, $args) = @_;
 
