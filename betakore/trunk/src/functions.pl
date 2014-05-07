@@ -528,7 +528,7 @@ sub finalInitialization {
 	StdHttpReader::init();
 	initStatVars();
 	initRandomRestart();
-	initUserSeed();
+	# initUserSeed(); not used atm
 	initConfChange();
 	Log::initLogFiles();
 	$eventsManager = new Events();
