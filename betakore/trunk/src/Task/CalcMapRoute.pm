@@ -215,7 +215,7 @@ sub searchStep {
 	{
 		my ($portal, $dest) = split /=/, $parent;
 		if (($self->{budget} ne '' && !($char->inventory->getByNameID(7060) && $openlist->{$parent}{ticket}) && ($openlist->{$parent}{cost} > $self->{budget}))
-			|| (!$config{vipPortals} && $openlist->{$parent}{vip})) {
+			|| (!$config{vipPortals} && $portals_lut{$portal}{dest}{$dest}{vip})) {
 			# This link is too expensive
 			# OR this is a vip portal, and we're not vip.
 			# We should calculate the entire route cost
