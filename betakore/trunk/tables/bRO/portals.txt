@@ -3188,6 +3188,9 @@ y_airport 143 49 y_airport 142 40 {
 y_airport 140 63 yuno 47 244 {
 	steps: c r0
 }
+y_airport 145 63 yuno 59 244 {
+	steps: c r0
+}
 
 # Lighthalzen airport
 lighthalzen 267 75 lhz_airport 142 17
@@ -3554,6 +3557,7 @@ prt_maze01 99 34 prt_maze01 139 45
 # splendide
 moc_para01 44 19 moc_fild20 342 198 {
 	steps: c r0 c
+	cost: 50000 # recheck
 }
 moc_fild20 368 197 moc_fild22b 175 159 {
 	steps: c r1 c
@@ -3632,10 +3636,12 @@ s_atelier 80 66 s_atelier 32 64
 s_atelier 32 64 s_atelier 80 63
 yuno_in04 33 130 yuno 93 180
 yuno 93 180 yuno_in04 33 127
+
 hu_fild01 140 163 tha_scene01 131 220 {
 	steps: c r2 c r0 c
 	cost: 5000
 }
+
 tha_t01 149 228 job3_sha01 71 36
 job3_sha01 71 19 tha_t01 149 224
 
@@ -3647,3 +3653,31 @@ airport 143 43 airport 148 51 {
 airport 143 49 airport 142 40 {
 	steps: c r0 c r0
 }
+
+alberta 200 151 malangdo 217 85 {
+	steps: c r1 c c r0 c
+	cost: 10000
+}
+
+payon_in01 193 92 payon_in01 146 61
+payon_in01 146 61 payon_in01 193 89
+payon_in01 181 43 payon_in01 181 70
+payon_in01 181 70 payon_in01 181 40
+payon 223 117 payon_in01 172 11
+payon_in01 172 11 payon 220 117
+
+cmd_fild09 106 195 in_rogue 246 25 { # Aragham_Jr
+	steps: c r1 r2 r1 r0 c
+	type: portal
+}
+
+cmd_fild04 304 180 in_rogue 164 106 { # Antonio_Jr
+	steps: c r2 r1 r1 r2 c
+	type: portal
+}
+	
+cmd_fild09 335 143 in_rogue 169 34 { # Holgren_Jr
+	steps: c r0 r2 r4 r0 c
+	type: portal
+}
+	
