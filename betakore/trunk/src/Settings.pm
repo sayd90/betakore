@@ -74,11 +74,11 @@ use enum qw(CONTROL_FILE_TYPE TABLE_FILE_TYPE);
 # The version number of this program.
 
 # Translation Comment: Strings for the name and version of the application
-our $NAME = 'OpenKore';
-our $VERSION = 'what-will-become-2.1';
+our $NAME = 'BetaKore';
+our $VERSION = 'undefined';
 # Translation Comment: Version String
 #our $SVN = T(" (SVN Version) ");
-our $WEBSITE = 'http://www.openkore.com/';
+our $WEBSITE = 'http://betakore.googlecode.com/';
 # Translation Comment: Version String
 our $versionText = "*** $NAME ${VERSION} ( r" . (getSVNRevision() || '?') . ' ) - ' . T("Custom Ragnarok Online client") . " ***\n***   $WEBSITE   ***\n";
 our $welcomeText = TF("Welcome to %s.", $NAME);
