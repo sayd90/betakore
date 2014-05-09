@@ -160,6 +160,7 @@ our @EXPORT = (
 	top10Listing
 	whenGroundStatus
 	writeStorageLog
+	readStorageLog
 	getBestTarget
 	isSafe
 	isSafeActorQuery/,
@@ -3139,6 +3140,39 @@ sub writeStorageLog {
 	my $f;
 
 	if (open($f, ">:utf8", $Settings::storage_log_file)) {
+		my $msg = TF("---------- Storage %s -----------\n", getFormattedDate(int(time)));
+		my %storage_h;	
+		for (my $i = 0; $i < @storageID; $i++) {
+			next if ($storageID[$i] eq "");
+			my $item = $storage{$storageID[$i]};
+			push @{$storage_h{$item->{type}}}, $item;		
+		}
+		
+		foreach my $storage_type (sort keys %storage_h) {
+			$msg .= sprintf("-- %s --\n", $itemTypes_lut{$storage_type});
+			foreach my $item (@{$storage_h{$storage_type}}) {
+				my $binID = $item->{binID};
+				my $display = $item->{name};
+				$display .= " x $item->{amount}" unless $item->equippable;
+				$display .= " -- " . T("Not Identified") if !$item->{identified};
+				$display .= " -- " . T("Broken") if $item->{broken};
+				$msg .= " $display\n";
+				# why would we store binID?
+				# $msg .= swrite(
+					# "@>>> @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+					# [$binID, $display]);
+			}
+		}
+		$msg .= "-------------------------------\n";
+		$msg .=  TF("Capacity: %d/%d\n", $storage{items}, $storage{items_max});
+		$msg .=  "-------------------------------\n";
+		print $f $msg;
+		close $f;
+		
+		message T("Storage logged\n"), "success";
+		
+# old storage log
+=pod		
 		print $f TF("---------- Storage %s -----------\n", getFormattedDate(int(time)));
 		for (my $i = 0; $i < @storageID; $i++) {
 			next if (!$storageID[$i]);
@@ -3161,6 +3195,21 @@ sub writeStorageLog {
 	} elsif ($show_error_on_fail) {
 		error TF("Unable to write to %s\n", $Settings::storage_log_file);
 	}
+=cut
+}
+
+sub readStorageLog {
+	my ($show_error_on_fail) = @_;
+	if (open(my $f, "<:utf8", $Settings::storage_log_file)) {
+		my @storage_log = <$f>;
+		foreach my $line (@storage_log) {
+			message "$line", "info";
+		}
+		return 1;
+	} elsif ($show_error_on_fail) {
+		error TF("Unable to read from %s\n", $Settings::storage_log_file);
+	}
+	return 0;
 }
 
 ##
