@@ -1383,7 +1383,7 @@ sub processAutoStorage {
 			}
 
 			$messageSender->sendStorageClose() unless $config{storageAuto_keepOpen};
-			if (percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'} && ai_storageAutoCheck() && AI::args->{forcedBySell}) {
+			if (percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'} && ai_storageAutoCheck() && (AI::args->{forcedBySell} || !$config{sellAuto})) {
 				error T("Character is still overweight after storageAuto (storage is full?)\n");
 				if ($config{dcOnStorageFull}) {
 					error T("Disconnecting on storage full!\n");
@@ -1531,7 +1531,7 @@ sub processAutoSell {
 				undef $args->{done} if ($hookArgs{return});
 				
 				# TODO: proper check
-				if (percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'} && ai_sellAutoCheck() && AI::args->{forcedByStorage}) {
+				if (percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'} && ai_sellAutoCheck() && (AI::args->{forcedByStorage} || !$config{storageAuto})) {
 					error T("Character is still overweight after storageAuto and sellAuto (storage is full?)\n");
 					if ($config{dcOnStorageFull}) {
 						error T("Disconnecting on storage full!\n");
