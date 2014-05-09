@@ -3191,11 +3191,10 @@ sub writeStorageLog {
 		close $f;
 
 		message T("Storage logged\n"), "success";
-
+=cut
 	} elsif ($show_error_on_fail) {
 		error TF("Unable to write to %s\n", $Settings::storage_log_file);
 	}
-=cut
 }
 
 sub readStorageLog {
