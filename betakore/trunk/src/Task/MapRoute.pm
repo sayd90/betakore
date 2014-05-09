@@ -28,7 +28,7 @@ use Translation qw(T TF);
 use Log qw(message debug warning error);
 use Network;
 use Plugins;
-use Misc qw(useTeleport);
+use Misc qw(useTeleport obstacleFound findNewCoordinates);
 use Utils qw(timeOut distance existsInList);
 use Utils::PathFinding;
 use Utils::Exceptions;
@@ -298,6 +298,11 @@ sub iterate {
 		} elsif ( Task::Route->getRoute(\@solution, $field, $self->{actor}{pos_to}, $self->{mapSolution}[0]{pos}) ) {
 			# X,Y is reachable from current position
 			# >> Then "route" to it
+			
+			if (obstacleFound($self->{new_x},$self->{new_y})) {
+				error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{mapSolution}[0]{pos}{x},$self->{mapSolution}[0]{pos}{y}, "move");
+				($self->{mapSolution}[0]{pos}{x},$self->{mapSolution}[0]{pos}{y}) =  findNewCoordinates($self->{mapSolution}[0]{pos}{x},$self->{mapSolution}[0]{pos}{y});
+			}
 			my $task = new Task::Route(
 				actor => $self->{actor},
 				x => $self->{mapSolution}[0]{pos}{x},
@@ -550,5 +555,6 @@ sub mapChanged {
 	my $self = $holder->[0];
 	$self->{mapChanged} = 1;
 }
+
 
 1;

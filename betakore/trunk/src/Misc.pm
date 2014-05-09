@@ -202,7 +202,9 @@ our @EXPORT = (
 	openShop
 	closeShop
 	inLockMap
-	parseReload/
+	parseReload
+	obstacleFound
+	findNewCoordinates/
 	);
 
 
@@ -4496,6 +4498,44 @@ sub buyingstoreitemdelete {
 	$item->{amount} -= $amount;
 	$char->inventory->remove($item) if ($item->{amount} <= 0);
 	$itemChange{$item->{name}} -= $amount;
+}
+
+# boolean Task::Move->obstacleFound(int $x, int $y)
+# Checks for an Actor(only players and npcs I suppose) on the (x,y) coordinates  (only players and npcs I suppose)
+# Return: 1 if there's someone on the spot, 0 otherwise.
+sub obstacleFound {
+	my ($x,$y) = @_;
+	debug "Looking for obstacles on ($x,$y)\n";
+	foreach (@{$playersList->getItems()}) {
+		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+	}
+	foreach (@{$npcsList->getItems()}) {
+		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+	}
+	return 0;
+}
+
+# Array Task::Move->findNewCoordinates(int $old_x_target, int $old_y_target)
+# Look for a new free cell around the old targeted coordinates
+# Return: Array (int $free_x_coord, int $free_y_coord)
+sub findNewCoordinates {
+	my ($old_x, $old_y) = @_;
+	debug "Calculating nearest free cell around ($old_x,$old_y)...\n";
+	my $modifier = 3;	
+	# Look for any possible cell in a 5x5 cells block
+	while ($modifier <= 11) {
+		for (my $x_axis = $old_x - ($modifier - 2); $x_axis <= $old_x + ($modifier - 2); $x_axis++) {
+			for (my $y_axis = $old_y - ($modifier - 2); $y_axis <= $old_y + ($modifier - 2); $y_axis++) {
+				if ($field->isWalkable($x_axis, $y_axis) && !obstacleFound($x_axis, $y_axis)) {
+					debug "Free cell found at ($x_axis, $y_axis)\n";
+					return ($x_axis, $y_axis);
+				}
+			}
+		}
+		$modifier+=2;
+	}
+	error "There's no free cells around ($old_x,$old_y)!\n";
+	return ($old_x, $old_y);
 }
 
 return 1;
