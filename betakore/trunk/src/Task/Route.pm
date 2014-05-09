@@ -27,8 +27,8 @@ use Task::WithSubtask;
 use base qw(Task::WithSubtask);
 use Task::Move;
 
-use Globals qw($field $net %config);
-use Log qw(message debug warning);
+use Globals qw($field $net %config $playersList $npcsList);
+use Log qw(message debug warning error);
 use Network;
 use Field;
 use Translation qw(T TF);
@@ -320,11 +320,14 @@ sub iterate {
 				if (distance(\%nextPos, $pos) > $config{$self->{actor}{configPrefix}.'route_step'}) {
 					debug "Route $self->{actor} - movement interrupted: reset route\n", "route";
 					$self->{stage} = '';
-
+				} elsif (obstacleFound($self->{new_x},$self->{new_y})) {
+						error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}, "move");
+						($self->{dest}{pos}{x},$self->{dest}{pos}{y}) =  findNewCoordinates($self->{new_x},$self->{new_y});
+						$self->{stage} = '';				
 				} else {
 					$self->{time_step} = time if ($cur_x != $self->{old_x} || $cur_y != $self->{old_y});
 					$self->{old_x} = $cur_x;
-					$self->{old_y} = $cur_y;
+					$self->{old_y} = $cur_y;					
 					debug "Route $self->{actor} - next step moving to ($self->{new_x}, $self->{new_y}), index $self->{index}, $stepsleft steps left\n", "route";
 					my $task = new Task::Move(
 						actor => $self->{actor},
@@ -423,5 +426,44 @@ sub mapChanged {
 	my $self = $holder->[0];
 	$self->{mapChanged} = 1;
 }
+
+# boolean Task::Move->obstacleFound(int $x, int $y)
+# Checks for an Actor(only players and npcs I suppose) on the (x,y) coordinates  (only players and npcs I suppose)
+# Return: 1 if there's someone on the spot, 0 otherwise.
+sub obstacleFound {
+	my ($x,$y) = @_;
+	debug "Looking for obstacles on ($x,$y)\n";
+	foreach (@{$playersList->getItems()}) {
+		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+	}
+	foreach (@{$npcsList->getItems()}) {
+		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+	}
+	return 0;
+}
+
+# Array Task::Move->findNewCoordinates(int $old_x_target, int $old_y_target)
+# Look for a new free cell around the old targeted coordinates
+# Return: Array (int $free_x_coord, int $free_y_coord)
+sub findNewCoordinates {
+	my ($old_x, $old_y) = @_;
+	debug "Calculating nearest free cell around ($old_x,$old_y)...\n";
+	my $modifier = 3;	
+	# Look for any possible cell in a 5x5 cells block
+	while ($modifier <= 11) {
+		for (my $x_axis = $old_x - ($modifier - 2); $x_axis <= $old_x + ($modifier - 2); $x_axis++) {
+			for (my $y_axis = $old_y - ($modifier - 2); $y_axis <= $old_y + ($modifier - 2); $y_axis++) {
+				if ($field->isWalkable($x_axis, $y_axis) && !obstacleFound($x_axis, $y_axis)) {
+					debug "Free cell found at ($x_axis, $y_axis)\n";
+					return ($x_axis, $y_axis);
+				}
+			}
+		}
+		$modifier+=2;
+	}
+	error "There's no free cells around ($old_x,$old_y)!\n";
+	return ($old_x, $old_y);
+}
+
 
 1;
