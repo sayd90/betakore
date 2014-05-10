@@ -320,7 +320,8 @@ sub iterate {
 				if (distance(\%nextPos, $pos) > $config{$self->{actor}{configPrefix}.'route_step'}) {
 					debug "Route $self->{actor} - movement interrupted: reset route\n", "route";
 					$self->{stage} = '';
-				} elsif (!Misc::canMoveTo($self->{new_x},$self->{new_y})) {
+				} elsif (($self->{dest}{pos}{x} == $self->{new_x}) && ($self->{dest}{pos}{y} == $self->{new_y}) # only check for the final destination
+							&& !Misc::canMoveTo($self->{new_x},$self->{new_y})) {
 					error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}), "move";
 					($self->{dest}{pos}{x},$self->{dest}{pos}{y}) = Misc::nearestWalkableCell($self->{new_x},$self->{new_y});
 					$self->{stage} = '';				
