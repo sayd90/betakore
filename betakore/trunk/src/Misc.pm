@@ -55,6 +55,7 @@ use Task::Teleport;
 use Time::HiRes qw(time usleep);
 use Translation;
 use Utils::Exceptions;
+use List::Util qw(shuffle);
 
 our @EXPORT = (
 	# Config modifiers
@@ -4532,11 +4533,18 @@ sub nearestWalkableCell {
 	for (my $distance = 1; $distance < 10; $distance++) {
 		my $vx = $distance;
 		my $vy = $distance;
-		
-		for (my $vy = $vx; $vy >= -$vx; $vy--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
-		for (my $vx = $vy-1; $vx > -$vy; $vx--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
-		for (my $vy = -$vx; $vy <= $vx; $vy++) { return (-$vx+$x, $vy+$y) if ($field->isWalkable(-$vx+$x, $vy+$y) && canMoveTo(-$vx+$x, $vy+$y)); }
-		for (my $vx = -$vy+1; $vx < $vy; $vx++) { return ($vx+$x, -$vy+$y) if ($field->isWalkable($vx+$x, -$vy+$y) && canMoveTo($vx+$x, -$vy+$y)); }
+		# This foreach loop will add some randomness to the code, but it's also very ugly and still not the desirable code
+		foreach my $code_order (shuffle (1, 2, 3, 4)) {
+			if ($code_order == 1) {
+				for (my $vy = $vx; $vy >= -$vx; $vy--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
+			} elsif ($code_order == 2) {
+				for (my $vx = $vy-1; $vx > -$vy; $vx--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
+			} elsif ($code_order == 3) {
+				for (my $vy = -$vx; $vy <= $vx; $vy++) { return (-$vx+$x, $vy+$y) if ($field->isWalkable(-$vx+$x, $vy+$y) && canMoveTo(-$vx+$x, $vy+$y)); }
+			} elsif ($code_order == 4) {
+				for (my $vx = -$vy+1; $vx < $vy; $vx++) { return ($vx+$x, -$vy+$y) if ($field->isWalkable($vx+$x, -$vy+$y) && canMoveTo($vx+$x, -$vy+$y)); }
+			}
+		}
 	}
 }
 
