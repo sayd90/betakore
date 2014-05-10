@@ -176,8 +176,6 @@ sub shutdown {
 	# Translation Comment: Kore's exit message
 	Log::message(T("Bye!\n"));
 	Log::message($Settings::versionText);
-	
-	$interface->title(TF("Bye! - %s", $Settings::NAME)) if $interface;
 
 	if (DEBUG && open(F, ">:utf8", "benchmark-results.txt")) {
 		print F Benchmark::results("mainLoop");
