@@ -32,7 +32,7 @@ use Log qw(message debug warning error);
 use Network;
 use Field;
 use Translation qw(T TF);
-use Misc qw(obstacleFound findNewCoordinates);
+use Misc qw(canMoveTo nearestWalkableCell);
 use Utils qw(timeOut distance calcPosition);
 use Utils::Exceptions;
 use Utils::Set;
@@ -320,10 +320,10 @@ sub iterate {
 				if (distance(\%nextPos, $pos) > $config{$self->{actor}{configPrefix}.'route_step'}) {
 					debug "Route $self->{actor} - movement interrupted: reset route\n", "route";
 					$self->{stage} = '';
-				} elsif (Misc::obstacleFound($self->{new_x},$self->{new_y})) {
-						error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}, "move");
-						($self->{dest}{pos}{x},$self->{dest}{pos}{y}) =  Misc::findNewCoordinates($self->{new_x},$self->{new_y});
-						$self->{stage} = '';				
+				} elsif (!Misc::canMoveTo($self->{new_x},$self->{new_y})) {
+					error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}), "move";
+					($self->{dest}{pos}{x},$self->{dest}{pos}{y}) = Misc::nearestWalkableCell($self->{new_x},$self->{new_y});
+					$self->{stage} = '';				
 				} else {
 					$self->{time_step} = time if ($cur_x != $self->{old_x} || $cur_y != $self->{old_y});
 					$self->{old_x} = $cur_x;

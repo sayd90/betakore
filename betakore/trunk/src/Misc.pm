@@ -203,8 +203,8 @@ our @EXPORT = (
 	closeShop
 	inLockMap
 	parseReload
-	obstacleFound
-	findNewCoordinates/
+	canMoveTo
+	nearestWalkableCell/
 	);
 
 
@@ -4500,42 +4500,44 @@ sub buyingstoreitemdelete {
 	$itemChange{$item->{name}} -= $amount;
 }
 
-# boolean Task::Move->obstacleFound(int $x, int $y)
+# boolean canMoveTo(int $x, int $y)
 # Checks for an Actor(only players and npcs I suppose) on the (x,y) coordinates  (only players and npcs I suppose)
 # Return: 1 if there's someone on the spot, 0 otherwise.
-sub obstacleFound {
+sub canMoveTo {
 	my ($x,$y) = @_;
-	debug "Looking for obstacles on ($x,$y)\n";
+	debug "Looking for obstacles on ($x,$y)\n", 2;
 	foreach (@{$playersList->getItems()}) {
-		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+		return 0 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
 	}
 	foreach (@{$npcsList->getItems()}) {
-		return 1 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
+		return 0 if ($_->{pos_to}{x} == $x && $_->{pos_to}{y} == $y);
 	}
-	return 0;
+	return 1;
 }
 
-# Array Task::Move->findNewCoordinates(int $old_x_target, int $old_y_target)
-# Look for a new free cell around the old targeted coordinates
+# Array nearestWalkableCell(int $old_x_target, int $old_y_target)
+# Look for a new -nearest- free cell around the old targeted coordinates
 # Return: Array (int $free_x_coord, int $free_y_coord)
-sub findNewCoordinates {
-	my ($old_x, $old_y) = @_;
-	debug "Calculating nearest free cell around ($old_x,$old_y)...\n";
-	my $modifier = 3;	
-	# Look for any possible cell in a 5x5 cells block
-	while ($modifier <= 11) {
-		for (my $x_axis = $old_x - ($modifier - 2); $x_axis <= $old_x + ($modifier - 2); $x_axis++) {
-			for (my $y_axis = $old_y - ($modifier - 2); $y_axis <= $old_y + ($modifier - 2); $y_axis++) {
-				if ($field->isWalkable($x_axis, $y_axis) && !obstacleFound($x_axis, $y_axis)) {
-					debug "Free cell found at ($x_axis, $y_axis)\n";
-					return ($x_axis, $y_axis);
-				}
-			}
-		}
-		$modifier+=2;
+sub nearestWalkableCell {
+	my ($x, $y) = @_;
+	debug "Calculating nearest free cell around ($x, $y)...\n";
+	
+	# spiral search algorithm
+	# TODO: randomize and make the selected cell less preditable. currently it always start calculating by the top-right cell
+	# X is the occupied cell, the numbers represent the algorithm sequence
+	# [7][8][1]
+	# [6][X][2]
+	# [5][4][3]
+	# TODO: cleaner, more understandable code
+	for (my $distance = 1; $distance < 10; $distance++) {
+		my $vx = $distance;
+		my $vy = $distance;
+		
+		for (my $vy = $vx; $vy >= -$vx; $vy--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
+		for (my $vx = $vy-1; $vx > -$vy; $vx--) { return ($vx+$x, $vy+$y) if ($field->isWalkable($vx+$x, $vy+$y) && canMoveTo($vx+$x, $vy+$y)); }
+		for (my $vy = -$vx; $vy <= $vx; $vy++) { return (-$vx+$x, $vy+$y) if ($field->isWalkable(-$vx+$x, $vy+$y) && canMoveTo(-$vx+$x, $vy+$y)); }
+		for (my $vx = -$vy+1; $vx < $vy; $vx++) { return ($vx+$x, -$vy+$y) if ($field->isWalkable($vx+$x, -$vy+$y) && canMoveTo($vx+$x, -$vy+$y)); }
 	}
-	error "There's no free cells around ($old_x,$old_y)!\n";
-	return ($old_x, $old_y);
 }
 
 return 1;
