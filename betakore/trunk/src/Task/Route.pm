@@ -320,11 +320,12 @@ sub iterate {
 				if (distance(\%nextPos, $pos) > $config{$self->{actor}{configPrefix}.'route_step'}) {
 					debug "Route $self->{actor} - movement interrupted: reset route\n", "route";
 					$self->{stage} = '';
-				} elsif (($self->{dest}{pos}{x} == $self->{new_x}) && ($self->{dest}{pos}{y} == $self->{new_y}) # only check for the final destination
-							&& !Misc::canMoveTo($self->{new_x},$self->{new_y})) {
-					error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}), "move";
-					($self->{dest}{pos}{x},$self->{dest}{pos}{y}) = Misc::nearestWalkableCell($self->{new_x},$self->{new_y});
-					$self->{stage} = '';				
+				# Below code needs too much improvement, was causing weird actions when attacking monsters, etc.
+				# } elsif (($self->{dest}{pos}{x} == $self->{new_x}) && ($self->{dest}{pos}{y} == $self->{new_y}) # only check for the final destination
+							# && !Misc::canMoveTo($self->{new_x},$self->{new_y})) {
+					# error TF("The spot on coordinates (%s,%s) is occupied by another actor.\n",$self->{new_x},$self->{new_y}), "move";
+					# ($self->{dest}{pos}{x},$self->{dest}{pos}{y}) = Misc::nearestWalkableCell($self->{new_x},$self->{new_y});
+					# $self->{stage} = '';				
 				} else {
 					$self->{time_step} = time if ($cur_x != $self->{old_x} || $cur_y != $self->{old_y});
 					$self->{old_x} = $cur_x;
