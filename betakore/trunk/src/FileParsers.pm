@@ -254,7 +254,7 @@ sub parseConfigFile {
 		} elsif (defined $commentBlock) {
 			next;
 
-		} elsif (!defined $inBlock && $line =~ /{$/) {
+		} elsif (!defined $inBlock && $line =~ /{$/ && $line !~ /^password .+$/) { # dirty fix for passwords with '{' character
 			# Begin of block
 			$line =~ s/ *{$//;
 			($key, $value) = $line =~ /^(.*?) (.*)/;
