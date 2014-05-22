@@ -4594,7 +4594,11 @@ sub cmdStorage_get {
 
 sub cmdStorage_gettocart {
 	my $items = shift;
-
+	if (!$char->cartActive) {
+		error T("Error in function 'storage gettocart' (Storage Functions)\n" .
+			"You do not have a cart.\n");
+		return;
+	}
 	my ($name, $amount) = $items =~ /^(.*?)(?: (\d+))?$/;
 	my $item = Match::storageItem($name);
 	if (!$item) {
