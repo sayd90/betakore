@@ -4500,18 +4500,10 @@ sub cmdStorage {
 		} elsif ($switch eq 'add' && $storage{opened}) {
 			cmdStorage_add($items);
 		} elsif ($switch eq 'addfromcart'  && $storage{opened}) {
-			if (!$char->cartActive) {
-				error "You do not have a cart!\n";
-				return;
-			}
 			cmdStorage_addfromcart($items);
 		} elsif ($switch eq 'get'  && $storage{opened}) {
 			cmdStorage_get($items);
 		} elsif ($switch eq 'gettocart' && $storage{opened}) {
-			if (!$char->cartActive) {
-				error "You do not have a cart!\n";
-				return;
-			}
 			cmdStorage_gettocart($items);
 		} elsif ($switch eq 'close'  && $storage{opened}) {
 			cmdStorage_close();
