@@ -536,6 +536,7 @@ sub subtaskDone {
 			} else {
 				$code = UNKNOWN_ERROR;
 			}
+			debug "MapRoute subtask TalkNPC ended with error code $code \n", 'route';
 			$self->setError($code, $error->{message});
 		}
 	} elsif ($task->isa('Task::Teleport')) {
