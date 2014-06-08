@@ -233,15 +233,19 @@ sub iterate {
 			# Choose a menu item.
 			my $choice = $1;
 			if ($npcTalkType eq 'select') {
-				if ($choice < @{$talk{responses}} - 1) {
+				if ($talk{responses} && $choice < @{$talk{responses}} - 1) {
 					$messageSender->sendTalkResponse($talk{ID}, $choice + 1);
-				} else {
+				} elsif ($talk{responses}) {
 					$self->setError(WRONG_NPC_INSTRUCTIONS,
 						TF("According to the given NPC instructions, menu item %d must " .
 						"now be selected, but there are only %d menu items.",
 						$choice, @{$talk{responses}} - 1));
 					$self->cancelTalk();
-				}
+				} else {
+					$self->setError(WRONG_NPC_INSTRUCTIONS,
+						TF("According to the given NPC instructions, menu item %d must " .
+						"now be selected, but there are no menu items.", $choice));
+				}	
 			} else {
 				$self->setError(WRONG_NPC_INSTRUCTIONS,
 					T("According to the given NPC instructions, a menu item " .
