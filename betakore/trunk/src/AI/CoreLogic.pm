@@ -912,16 +912,23 @@ sub processDead {
 		AI::clear();
 		AI::queue("dead");
 	}
-
-	if (AI::action eq "dead" && $config{dcOnDeath} != -1 && time - $char->{dead_time} >= $timeout{ai_dead_respawn}{timeout}) {
+	
+	my $deathReaction = defined $config{reactionOnDeath}?$config{reactionOnDeath}:$config{dcOnDeath}+1;
+	
+	if (AI::action eq "dead" && $deathReaction == 1 && time - $char->{dead_time} >= $timeout{ai_dead_respawn}{timeout}) {
+		# respawn
 		$messageSender->sendRestart(0);
 		$char->{'dead_time'} = time;
-	}
-
-	if (AI::action eq "dead" && $config{dcOnDeath} && $config{dcOnDeath} != -1) {
+	} elsif (AI::action eq "dead" && $deathReaction == 2) {
+		# dc
 		message T("Disconnecting on death!\n");
 		chatLog("k", T("*** You died, auto disconnect! ***\n"));
 		$quit = 1;
+	} elsif (AI::action eq "dead" && $deathReaction == 3 && time - $char->{dead_time} >= $timeout{ai_dead_respawn}{timeout}) {
+		# auto-revive
+		message T("You died, trying to auto-revive\n");
+		$messageSender->sendAutoRevive();
+		$char->{'dead_time'} = time;
 	}
 }
 
@@ -1022,7 +1029,7 @@ sub processAutoMakeArrow {
 sub processAutoStorage {
 	# storageAuto - chobit aska 20030128
 	if (AI::is("", "route", "sitAuto", "follow")
-		  && $config{storageAuto} && ($config{storageAuto_npc} ne "" || $config{storageAuto_useChatCommand})
+		  && $config{storageAuto} && (($config{storageAuto_npc} ne "" && $char->{skills}{NV_BASIC}{lv} >= 6) || $config{storageAuto_useChatCommand})
 		  && !$ai_v{sitAuto_forcedBySitCommand}
 		  && (($config{'itemsMaxWeight_sellOrStore'} && percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'})
 		      || (!$config{'itemsMaxWeight_sellOrStore'} && percent_weight($char) >= $config{'itemsMaxWeight'}))
@@ -1178,6 +1185,14 @@ sub processAutoStorage {
 				if ($config{storageAuto_useChatCommand}) {
 					$messageSender->sendChat($config{storageAuto_useChatCommand});
 				} else {
+					if ($config{minStorageZeny}) {
+						if ($char->{zeny} < $config{minStorageZeny}) {
+							message "Not enough zeny for storageAuto sequence, aborting. \n", "error";
+							$args->{done} = 1;
+							return;
+						}
+					}
+					
 					if ($config{'storageAuto_npc_type'} eq "" || $config{'storageAuto_npc_type'} eq "1") {
 						warning T("Warning storageAuto has changed. Please read News.txt\n") if ($config{'storageAuto_npc_type'} eq "");
 						$config{'storageAuto_npc_steps'} = "c r1 n";
@@ -1388,7 +1403,7 @@ sub processAutoStorage {
 				if ($config{dcOnStorageFull}) {
 					error T("Disconnecting on storage full!\n");
 					chatLog("k", T("Disconnecting on storage full!\n"));
-					quit();
+					($config{dcOnStorageFull} == 2) ? offlineMode() : quit();
 				}
 			}
 			
@@ -1536,7 +1551,7 @@ sub processAutoSell {
 					if ($config{dcOnStorageFull}) {
 						error T("Disconnecting on storage full!\n");
 						chatLog("k", T("Disconnecting on storage full!\n"));
-						quit();
+						($config{dcOnStorageFull} == 2) ? offlineMode() : quit();
 					}
 				}
 			}
@@ -1723,10 +1738,22 @@ sub processAutoBuy {
 
 			my $maxbuy = ($config{"buyAuto_$args->{index}"."_price"}) ? int($char->{zeny}/$config{"buyAuto_$args->{index}"."_price"}) : 30000; # we assume we can buy 30000, when price of the item is set to 0 or undef
 			my $needbuy = $config{"buyAuto_$args->{index}"."_maxAmount"};
-			$needbuy -= $char->inventory->get($args->{invIndex})->{amount} if ($args->{invIndex} ne ""); # we don't need maxAmount if we already have a certain amount of the item in our inventory
-			$messageSender->sendBuyBulk([{itemID  => $args->{itemID}, amount => ($maxbuy > $needbuy) ? $needbuy : $maxbuy}]); # TODO: we could buy more types of items at once
-
-			$timeout{ai_buyAuto_wait_buy}{time} = time;
+			$needbuy -= $char->inventory->get($args->{invIndex})->{amount} if ($args->{invIndex} ne ""); # we don't need maxAmount if we already have a certain amount of the item in our inventory]
+			my $found;
+			for (my $i = 0; $i < @storeList; $i++) {
+				if ($storeList[$i]{'nameID'} == $args->{itemID}) {
+					$messageSender->sendBuyBulk([{itemID  => $args->{itemID}, amount => ($maxbuy > $needbuy) ? $needbuy : $maxbuy}]); # TODO: we could buy more types of items at once
+					$timeout{ai_buyAuto_wait_buy}{time} = time;
+					$found = 1;
+				}
+			}
+			
+			if (!$found) {
+				error TF("Item %s not found, disabling buyAuto block\n", $config{"buyAuto_$args->{index}"} );
+				configModify("buyAuto_$args->{index}"."_disabled", 1);
+			}
+			
+			
 		}
 	}
 }
