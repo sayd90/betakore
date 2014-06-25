@@ -801,6 +801,9 @@ sub processDealAuto {
 			timeOut($timeout{ai_dealAuto})) {
 			$messageSender->sendDealReply(3);
 			$timeout{'ai_dealAuto'}{'time'} = time;
+		} else { # Cancel any trade that doesn't fit the condition above
+			$messageSender->sendDealReply(4);
+			$timeout{'ai_dealAutoCancel'}{'time'} = time;
 		}
 	}
 }
