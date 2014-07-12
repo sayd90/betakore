@@ -1144,7 +1144,7 @@ sub charSelectScreen {
 		next unless ($chars[$num] && %{$chars[$num]});
 		if (0) {
 			# The old (more verbose) message
-			swrite(
+			message swrite(
 				T("-------  Character \@< ---------\n" .
 				"Name: \@<<<<<<<<<<<<<<<<<<<<<<<<\n" .
 				"Job:  \@<<<<<<<      Job Exp: \@<<<<<<<\n" .
@@ -1155,11 +1155,11 @@ sub charSelectScreen {
 				"SP:   \@||||/\@||||   Dex: \@<<<<<<<<\n" .
 				"zeny: \@<<<<<<<<<<  Luk: \@<<<<<<<<\n" .
 				"-------------------------------"),
-				$num, $chars[$num]{'name'}, $jobs_lut{$chars[$num]{'jobID'}}, $chars[$num]{'exp_job'},
+				[$num, $chars[$num]{'name'}, $jobs_lut{$chars[$num]{'jobID'}}, $chars[$num]{'exp_job'},
 				$chars[$num]{'lv'}, $chars[$num]{'str'}, $chars[$num]{'lv_job'}, $chars[$num]{'agi'},
 				$chars[$num]{'exp'}, $chars[$num]{'vit'}, $chars[$num]{'hp'}, $chars[$num]{'hp_max'},
 				$chars[$num]{'int'}, $chars[$num]{'sp'}, $chars[$num]{'sp_max'}, $chars[$num]{'dex'},
-				$chars[$num]{'zeny'}, $chars[$num]{'luk'});
+				$chars[$num]{'zeny'}, $chars[$num]{'luk'}]);
 		}
 
 		my $messageDeleteDate;
@@ -4437,7 +4437,7 @@ sub closeShop {
 		error T("A shop has not been opened.\n");
 		return;
 	}
-
+	$ai_v{'cart_time'} = time + 2;
 	$messageSender->sendCloseShop();
 
 	$shopstarted = 0;
