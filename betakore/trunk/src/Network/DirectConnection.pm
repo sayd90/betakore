@@ -467,6 +467,12 @@ sub checkConnection {
 				$quit = 1;
 				return;
 			}
+			unless ($self->{conRetries}) {
+				error T("Error while connecting, retrying...\n"), "connection";
+				$self->{conRetries}++;
+				undef $conState_tries;
+				return;
+			}
 			error T("Timeout on Account Server, reconnecting...\n"), "connection";
 			$timeout_ex{'master'}{'time'} = time;
 			$timeout_ex{'master'}{'timeout'} = $timeout{'reconnect'}{'timeout'};
@@ -541,6 +547,12 @@ sub checkConnection {
 				return;
 			}
 		} elsif (timeOut($timeout{'gamelogin'}) && ($config{'server'} ne "" || $masterServer->{'charServer_ip'})) {
+			unless ($self->{conRetries}) {
+				error T("Error while connecting, retrying...\n"), "connection";
+				$self->{conRetries}++;
+				undef $conState_tries;
+				return;
+			}
 			error TF("Timeout on Character Server, reconnecting. Wait %s seconds...\n", $timeout{'reconnect'}{'timeout'}), "connection";
 			$timeout_ex{'master'}{'time'} = time;
 			$timeout_ex{'master'}{'timeout'} = $timeout{'reconnect'}{'timeout'};
