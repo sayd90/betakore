@@ -20,6 +20,7 @@
 package Network::Receive;
 
 use strict;
+use Time::HiRes qw(time);
 use Network::PacketParser; # import
 use base qw(Network::PacketParser);
 use encoding 'utf8';
@@ -1644,7 +1645,7 @@ sub cash_dealer {
 
 	$ai_v{npc_talk}{talk} = 'cash';
 	# continue talk sequence now
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 
 	message TF("------------CashList (Cash Point: %-5d)-------------\n" .
 		"#    Name                    Type               Price\n", $char->{cashpoint}), "list";
@@ -2898,7 +2899,7 @@ sub npc_sell_list {
 	message T("Ready to start selling items\n");
 
 	# continue talk sequence now
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 }
 
 sub npc_store_begin {
@@ -2907,7 +2908,7 @@ sub npc_store_begin {
 	$talk{buyOrSell} = 1;
 	$talk{ID} = $args->{ID};
 	$ai_v{npc_talk}{talk} = 'buy';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 
 	my $name = getNPCName($args->{ID});
 
@@ -2985,7 +2986,7 @@ sub npc_talk {
 	$talk{msg} =~ s/\^[a-fA-F0-9]{6}//g;
 
 	$ai_v{npc_talk}{talk} = 'initiated';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 
 	my $name = getNPCName($talk{ID});
 	Plugins::callHook('npc_talk', {
@@ -3018,7 +3019,7 @@ sub npc_talk_close {
 	}
 
 	$ai_v{npc_talk}{talk} = 'close';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 	undef %talk;
 
 	Plugins::callHook('npc_talk_done', {ID => $ID});
@@ -3030,7 +3031,7 @@ sub npc_talk_continue {
 	my $name = getNPCName($ID);
 
 	$ai_v{npc_talk}{talk} = 'next';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 
 	if ($config{autoTalkCont}) {
 		message TF("%s: Auto-continuing talking\n", $name), "npc";
@@ -3049,7 +3050,7 @@ sub npc_talk_number {
 
 	my $name = getNPCName($ID);
 	$ai_v{npc_talk}{talk} = 'number';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 
 	message TF("%s: Type 'talk num <number #>' to input a number.\n", $name), "input";
 	$ai_v{'npc_talk'}{'talk'} = 'num';
@@ -3114,7 +3115,7 @@ sub npc_talk_text {
 	my $name = getNPCName($ID);
 	message TF("%s: Type 'talk text' (Respond to NPC)\n", $name), "npc";
 	$ai_v{npc_talk}{talk} = 'text';
-	$ai_v{npc_talk}{time} = time;
+	$ai_v{npc_talk}{time} = Time::HiRes::time;
 }
 
 # TODO: store this state
@@ -3629,6 +3630,32 @@ sub guild_expulsion {
 		"Reason: %s\n", bytesToString($args->{name}), bytesToString($args->{message})), "schat";
 }
 
+sub search_store_open {
+	my ($self, $args) = @_;
+	message TF("Got type %s, you have %s searches\n", $args->{type}, $args->{searches});
+}
+
+sub search_store_result {
+	my ($self, $args) = @_;
+	message TF("Result len %s, first page: %s next: %s, searches: %s\n", $args->{len}, $args->{first_page}, $args->{has_next_page}, $args->{searches});
+	
+	for (my $offset = 0; ($offset + 106) < $args->{len}; $offset += 106) {
+	my %item;
+		($item{SSI_ID},
+			$item{AID},
+			$item{store_name},
+			$item{item_id},
+			$item{item_type},
+			$item{price},
+			$item{count},
+			$item{refine},
+			$item{card}[0],
+			$item{card}[1],
+			$item{card}[2],
+			$item{card}[3]) = unpack('V2 Z80 v C V v C v4', substr($args->{searchInfo}, $offset, 106));
+		message TF("%s %s %s %s\n", $item{store_name}, $item{item_id},$item{count}, $item{price});
+	}
+}
 
 sub guild_member_online_status {
 	my ($self, $args) = @_;
