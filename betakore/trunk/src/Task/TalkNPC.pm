@@ -93,7 +93,7 @@ sub DESTROY {
 sub activate {
 	my ($self) = @_;
 	$self->SUPER::activate(); # Do not forget to call this!
-	$self->{time} = time;
+	$self->{time} = Time::HiRes::time;
 	$self->{stage} = 'Not Started';
 	$self->{mapChanged} = 0;
 }
@@ -131,7 +131,7 @@ sub iterate {
 					$self->{ID} = $target->{ID};
 					$self->{stage} = 'Talking to NPC';
 					$self->{steps} = [parseArgs("x $self->{sequence}")];
-					$self->{time} = time;
+					$self->{time} =  Time::HiRes::time;
 					undef $ai_v{npc_talk}{time};
 					undef $ai_v{npc_talk}{talk};
 					lookAtPosition($self);
@@ -141,7 +141,7 @@ sub iterate {
 				$self->{target} = $npcsList->getByID($self->{ID});
 				$self->{stage} = 'Talking to NPC';
 				$self->{steps} = [parseArgs("$self->{sequence}")];
-				$self->{time} = time;
+				$self->{time} =  Time::HiRes::time;
 				#undef $ai_v{npc_talk}{time};
 				#undef $ai_v{npc_talk}{talk};
 				#lookAtPosition($self);
@@ -168,11 +168,11 @@ sub iterate {
 		if ($ai_v{npc_talk}{talk} eq 'close' && $self->{steps}[0] =~ /x/i) {
 			undef $ai_v{npc_talk}{talk};
 		}
-		$self->{time} = time;
+		$self->{time} =  Time::HiRes::time;
 
 		# We give the NPC some time to respond. This time will be reset once
 		# the NPC responds.
-		$ai_v{npc_talk}{time} = time + $timeResponse;
+		$ai_v{npc_talk}{time} =  Time::HiRes::time + $timeResponse;
 
 		if ($config{autoTalkCont}) {
 			while ($self->{steps}[0] =~ /^c$/i) {
@@ -187,14 +187,14 @@ sub iterate {
 		if ($step =~ /^w(\d+)/i) {
 			# Wait x seconds.
 			my $time = $1;
-			$ai_v{npc_talk}{time} = time + $time;
-			$self->{time} = time + $time;
+			$ai_v{npc_talk}{time} =  Time::HiRes::time + $time;
+			$self->{time} =  Time::HiRes::time + $time;
 			
 		} elsif ( $step =~ /^a=(.*)/i ) {
 			# Run a command.
 			my $command = $1;
-			$ai_v{npc_talk}{time} = time + $timeResponse - 4;
-			$self->{time} = time + $timeResponse - 4;
+			$ai_v{npc_talk}{time} =  Time::HiRes::time + $timeResponse - 4;
+			$self->{time} =  Time::HiRes::time + $timeResponse - 4;
 			Commands::run($command);
 			
 		} elsif ( $step =~ /c/i ) {
@@ -256,8 +256,8 @@ sub iterate {
 		} elsif ( $step =~ /n/i ) {
 			# Click Close or Cancel.
 			$self->cancelTalk();
-			$ai_v{npc_talk}{time} = time;
-			$self->{time} = time;
+			$ai_v{npc_talk}{time} =  Time::HiRes::time;
+			$self->{time} =  Time::HiRes::time;
 
 		} elsif ( $step =~ /b.*/i ) {
 			# Get the shop's item list.
@@ -284,8 +284,8 @@ sub iterate {
 				}
 				# We give some time to get inventory_item_added packet from server.
 				# And skip this itteration.
-				$ai_v{npc_talk}{time} = time + 0.2;
-				$self->{time} = time + 0.2;
+				$ai_v{npc_talk}{time} =  Time::HiRes::time + 0.2;
+				$self->{time} =  Time::HiRes::time + 0.2;
 				return;
 			}
 
@@ -297,6 +297,7 @@ sub iterate {
 			# ? Pretend like the conversation was stopped by the NPC?
 			$ai_v{npc_talk}{talk} = 'close';
 		}
+		$self->{lastTalk} = Time::HiRes::time;
 
 		shift @{$self->{steps}};
 	}
