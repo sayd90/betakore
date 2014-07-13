@@ -61,7 +61,7 @@ use enum qw(
 sub new {
 	my $class = shift;
 	my %args = @_;
-	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport']);
+	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport', 'movement'], priority => Task::HIGH_PRIORITY);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
 	$self->{giveup}{timeout} = $args{giveup_time} || 4;
