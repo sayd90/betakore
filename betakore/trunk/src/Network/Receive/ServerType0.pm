@@ -503,7 +503,9 @@ sub new {
 		'0828' => ['char_delete2_result', 'a4 V2', [qw(charID result deleteDate)]], # 14
 		'082C' => ['char_delete2_cancel_result', 'a4 V', [qw(charID result)]], # 14
 		'082D' => ['received_characters', 'x2 C5 x20 a*', [qw(normal_slot premium_slot billing_slot producible_slot valid_slot charInfo)]],
+		'0836' => ['search_store_result', 'v C3 a*', [qw(len first_page has_next_page searches searchInfo)]],
 		'0839' => ['guild_expulsion', 'Z40 Z24', [qw(message name)]],
+		'083A' => ['search_store_open', 'v C', [qw(type searches)]],
 		'083E' => ['login_error', 'V Z20', [qw(type date)]],
 		'0845' => ['cash_shop_open_result', 'v2', [qw(cash_points kafra_points)]],
 		'0849' => ['cash_shop_buy_result', 'V s V', [qw(item_id result updated_points)]],
@@ -2333,7 +2335,9 @@ sub vending_start {
 
 	my $msg = $args->{RAW_MSG};
 	my $msg_size = unpack("v1",substr($msg, 2, 2));
-
+	
+	$ai_v{'cart_time'} = time + 1;
+	
 	#started a shop.
 	message TF("Shop '%s' opened!\n", $shop{title}), "success";
 	@articles = ();
