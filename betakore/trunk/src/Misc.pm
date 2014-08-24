@@ -205,7 +205,8 @@ our @EXPORT = (
 	inLockMap
 	parseReload
 	canMoveTo
-	nearestWalkableCell/
+	nearestWalkableCell
+	closestStorageNPC/
 	);
 
 
@@ -4546,6 +4547,57 @@ sub nearestWalkableCell {
 			}
 		}
 	}
+}
+
+# string closestStorageNPC(string fieldName)
+# Search for a storage NPC location not too far from the player. 
+# Return: string "<map name> <pos x> <pos y>"
+sub closestStorageNPC {
+	my $current_map = shift;
+	my $prefix = substr($current_map,0,3);
+	my $city = "";
+	
+	# TODO: It might be better to break this in its on subroutine for reusability's sake. 
+	if ($prefix eq "ald" || $prefix eq "c_t" || $prefix eq "mjo") { $city = "aldebaran"; } 
+	elsif ($prefix eq "ama") { $city = "amatsu"; } 
+	elsif ($prefix eq "ayo") {	$city = "ayothaya";	} 
+	elsif ($prefix eq "bea" || $prefix eq "cmd") { $city = "comodo";	} 
+	elsif ($prefix eq "bra") { $city = "brasilis"; } 
+	elsif ($prefix eq "dew") { $city = "dewata"; }
+	elsif ($prefix eq "ein") { $city = "einbroch"; } 
+	elsif ($prefix eq "gef" || $prefix eq "gl_") {	$city = "geffen"; } 
+	elsif ($prefix eq "gon") { $city = "gonryun"; } 
+	elsif ($prefix eq "hu_") { $city = "hugel"; } 
+	elsif ($prefix eq "ice" || $prefix eq "ra_") {	$city = "rachel"; } 
+	elsif ($prefix eq "iz_") { $city = "izlude"; } 
+	elsif ($prefix eq "jup" || $prefix eq "kh_" || $prefix eq "yun") { $city = "yuno"; } 
+	elsif ($prefix eq "lhz") { $city = "lighthalzen"; } 
+	elsif ($prefix eq "lou") { $city = "louyang"; } 
+	elsif ($prefix eq "ma_") { $city = "malaya"; } 
+	elsif ($prefix eq "man") { $city = "manuk"; } 
+	elsif ($prefix eq "moc") { $city = "morocc"; } 
+	elsif ($prefix eq "mos") { $city = "moscovia"; }
+	elsif ($prefix eq "pay") { $city = "payon"; } 
+	elsif ($prefix eq "prt") { $city = "prontera"; } 
+	elsif ($prefix eq "um_") { $city = "umbala"; } 
+	elsif ($prefix eq "tho" || $prefix eq "ve_") { $city = "veins"; }
+	
+	# Look for a kafra in the city
+	open (FH, "<:utf8", Settings::getTableFilename('npcs.txt'));
+	while (<FH>) {
+		if ($_ =~ /$city (\d+) (\d+) (.*)/) {
+			my $pos_x = $1;
+			my $pos_y = $2;
+			if ($_ =~ /(kafra|corp)/i) {
+				return $city ." ". $pos_x ." ". $pos_y."\n";
+			}
+		}
+	}
+	close (FH);
+	
+	# No NPC found
+	error "No storage NPC was found..\n";
+	return "";
 }
 
 return 1;
