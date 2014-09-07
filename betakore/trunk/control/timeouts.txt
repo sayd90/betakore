@@ -9,8 +9,12 @@ gamelogin 12
 charlogin 12
 maplogin 12
 play 40
+
 # When disconnected, wait x seconds before reconnecting again
 reconnect 30
+
+# When disconnected by dcOnPlayer wait x seconds before reconnecting again (if the flag is equal to 2)
+reconnectDcOnPlayer 300
 
 # Wait x seconds for a poseidon reply before disconnecting
 # Ignore this if you don't use Poseidon Server

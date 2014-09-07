@@ -3163,8 +3163,12 @@ sub processDcOnPlayer {
 	if (!$field->isCity && !AI::inQueue("storageAuto", "buyAuto") && $config{dcOnPlayer}
 	    && ($config{'lockMap'} eq "" || $field->baseName eq $config{'lockMap'})
 	    && !isSafe() && timeOut($AI::Temp::Teleport_allPlayers, 0.75)) {
-
-		$quit = 1;
+		if ($config{dcOnPlayer} == 1) {
+			$quit = 1;
+		} elsif ($config{dcOnPlayer} == 2) {
+			error "Auto relog on player...\n";
+			relog($timeout{reconnectDcOnPlayer}{timeout});
+		}
 	}
 }
 
