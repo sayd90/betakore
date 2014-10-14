@@ -337,7 +337,7 @@ sub new {
 		'020A' => ['friend_removed', 'a4 a4', [qw(friendAccountID friendCharID)]], # 10
 		# // 0x020b,0
 		# // 0x020c,0
-		# 0x020d,-1 # TODO
+		'020D' => ['character_block_info', 'v2 a*', [qw(len unknown)]], # -1 TODO
 		'07FA' => ['inventory_item_removed', 'v3', [qw(reason index amount)]], #//0x07fa,8
 		'0803' => ['booking_register_request', 'v', [qw(result)]],
 		'0805' => ['booking_search_request', 'x2 a a*', [qw(IsExistMoreResult innerData)]],
@@ -1920,12 +1920,6 @@ sub stats_points_needed {
 		$char->{points_luk} = $args->{val};
 		debug "Points needed for Luck: $args->{val}\n", "parseMsg";
 	}
-}
-
-sub switch_character {
-	# User is switching characters in X-Kore
-	$net->setState(Network::CONNECTED_TO_MASTER_SERVER);
-	$net->serverDisconnect();
 }
 
 sub unequip_item {

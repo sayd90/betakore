@@ -4088,6 +4088,21 @@ sub sync_request {
 	}
 }
 
+# 00B3
+# TODO: add real client messages and logic?
+# ClientLogic: LoginStartMode = 5; ShowLoginScreen;
+sub switch_character {
+	my ($self, $args) = @_;
+	# User is switching characters in X-Kore
+	$net->setState(Network::CONNECTED_TO_MASTER_SERVER);
+	$net->serverDisconnect();
+
+	# FIXME better support for multiple received_characters packets
+	undef @chars;
+
+	debug "result: $args->{result}\n";
+}
+
 sub taekwon_rank {
 	my ($self, $args) = @_;
 	message T("TaeKwon Mission Rank : ".$args->{rank}."\n"), "info";
@@ -6401,6 +6416,16 @@ sub player_equipment {
 		}
 		$player->{shoes} = $ID1;
 	}
+}
+
+
+sub disconnect_character {
+	my ($self, $args) = @_;
+	debug "disconnect_character result: $args->{result}\n";
+}
+
+sub character_block_info {
+	#TODO
 }
 
 1;

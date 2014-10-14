@@ -2669,21 +2669,6 @@ sub quest_update_mission_hunt {
 	}
 }
 
-# 00B3
-# TODO: add real client messages and logic?
-# ClientLogic: LoginStartMode = 5; ShowLoginScreen;
-sub switch_character {
-	my ($self, $args) = @_;
-	# User is switching characters in X-Kore
-	$net->setState(Network::CONNECTED_TO_MASTER_SERVER);
-	$net->serverDisconnect();
-
-	# FIXME better support for multiple received_characters packets
-	undef @chars;
-
-	debug "result: $args->{result}\n";
-}
-
 use constant {
 	EXP_FROM_BATTLE => 0x0,
 	EXP_FROM_QUEST => 0x1,
