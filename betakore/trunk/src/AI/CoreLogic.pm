@@ -1136,11 +1136,6 @@ sub processAutoStorage {
 			# Stop if the specified NPC is invalid
 			$args->{npc} = {};
 			
-			# Auto set a storage NPC in case none was specified
-			if (!$config{'storageAuto_npc'} && $config{'storageAuto_npc_auto'}) {
-				$config{'storageAuto_npc'} = closestStorageNPC($field->{baseName});
-			}
-			
 			getNPCInfo($config{'storageAuto_npc'}, $args->{npc});
 			if (!defined($args->{npc}{ok})) {
 				$args->{done} = 1;

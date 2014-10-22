@@ -652,7 +652,6 @@ sellAuto_standpoint
 sellAuto_distance 5
 
 storageAuto 0
-storageAuto_npc_auto 0
 storageAuto_npc
 storageAuto_distance 5
 storageAuto_npc_type 1
