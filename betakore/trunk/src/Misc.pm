@@ -3249,6 +3249,7 @@ sub getBestTarget {
 				|| ($control->{attack_sp}  ne "" && $control->{attack_sp} > $char->{sp})
 				|| ($control->{attack_auto} == 3 && ($monster->{dmgToYou} || $monster->{missedYou} || $monster->{dmgFromYou}))
 				|| ($control->{attack_auto} == 0 && !($monster->{dmgToYou} || $monster->{missedYou}))
+				|| ($control->{prevent_assist} ne "" && checkVisibleMonsterQuantity($monster->{nameID}) > $control->{prevent_assist})
 			);
 		}
 		if ($config{'attackCanSnipe'}) {
@@ -4100,6 +4101,17 @@ sub checkSelfCondition {
 	return 0 if (!$hookArgs{return});
 
 	return 1;
+}
+
+sub checkVisibleMonsterQuantity {
+	my ($monID) = @_;
+	my $count = 0;
+	foreach my $monster (@{$monstersList->getItems()}) {
+		if ($monster->{nameID} == $monID) {
+			$count++;
+		}
+	}
+	return $count;
 }
 
 sub checkPlayerCondition {
