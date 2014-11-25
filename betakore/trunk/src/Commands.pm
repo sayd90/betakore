@@ -682,8 +682,29 @@ sub cmdAutoSell {
 }
 
 sub cmdAutoStorage {
-	message T("Initiating auto-storage.\n");
-	AI::queue("storageAuto");
+	my (undef, $arg) = @_;
+	if ($arg eq 'simulate' || $arg eq 'test' || $arg eq 'debug') {
+		# Simulate list of items to sell
+		my @strgItems;
+		message T("--------------- Items to store (simulation) ---------------\n"), "info";	
+		foreach my $item (@{$char->inventory->getItems()}) {			
+			my $control = items_control($item->{name});
+
+			if ($control->{'storage'} && $item->{'amount'} > $control->{keep}) {
+				my %obj;
+				$obj{index} = $item->{index};
+				$obj{amount} = $item->{amount} - $control->{keep};
+				my $item_name = $item->{name};
+				$item_name .= ' (if unequipped)' if ($item->{equipped});
+				message(swrite(
+						"@>>>>>>>> x @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", [$item->{amount}, $item_name]),"list");
+			}
+		}
+		message("-----------------------------------------------------------\n","list")
+	} elsif (!$arg) {
+		message T("Initiating auto-storage.\n");
+		AI::queue("storageAuto");
+	}
 }
 
 sub cmdBangBang {
