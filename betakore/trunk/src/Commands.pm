@@ -2808,6 +2808,11 @@ sub cmdIdentify {
 		message("------------------------------\n", "list");
 	} elsif (!defined @identifyID) {
 		error T("The identify list is empty, please use the identify skill or a magnifier first.\n");
+	} elsif ($arg1 =~ /^byindex (\d+)$/) {
+		my $item = Match::inventoryItem($1);
+		if ($item && !$item->{identified}) {
+			$messageSender->sendIdentify($item->{index});
+		}
 	} elsif ($arg1 =~ /^\d+$/) {
 		if ($identifyID[$arg1] eq "") {
 			error TF("Error in function 'identify' (Identify Item)\n" .
@@ -5681,7 +5686,7 @@ sub cmdAuction {
 }
 
 sub cmdQuest {
-	if (!$net || $net->getState() != Network::IN_GAME) {
+	if (!$questList) {
 		error TF("You must be logged in the game to use this command '%s'\n", shift);
 		return;
 	}
