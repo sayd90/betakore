@@ -536,7 +536,8 @@ sub new {
 		'099B' => ['map_property3', 'v a4', [qw(type info_table)]],
 		'099D' => ['received_characters', 'v a*', [qw(len charInfo)]],
 		'099F' => ['area_spell_multiple2', 'v a*', [qw(len spellInfo)]], # -1
-		'09CF' => ['gameguard_request']
+		'09CF' => ['gameguard_request'],
+		'0A27' => ['hp_sp_changed', 'v2', [qw(type amount)]]
 	};
 
 	# Item RECORD Struct's
