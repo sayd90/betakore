@@ -662,7 +662,7 @@ sub cmdAutoSell {
 		foreach my $item (@{$char->inventory->getItems()}) {
 			next if ($item->{unsellable});
 			
-			my $control = items_control($item->{name});
+			my $control = items_control(itemName($item, {no_broken => 1}));
 
 			if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
 				my %obj;
@@ -687,8 +687,8 @@ sub cmdAutoStorage {
 		# Simulate list of items to sell
 		my @strgItems;
 		message T("--------------- Items to store (simulation) ---------------\n"), "info";	
-		foreach my $item (@{$char->inventory->getItems()}) {			
-			my $control = items_control($item->{name});
+		foreach my $item (@{$char->inventory->getItems()}) {		
+			my $control = items_control(itemName($item, {no_broken => 1}));
 
 			if ($control->{'storage'} && $item->{'amount'} > $control->{keep}) {
 				my %obj;
