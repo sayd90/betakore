@@ -577,6 +577,7 @@ sub parseMonControl {
 			$r_hash->{$key}{attack_sp} = $args[7];
 			$r_hash->{$key}{weight} = $args[8];
 			$r_hash->{$key}{prevent_assist} = $args[9];
+			$r_hash->{$key}{aggressive_if_dist} = $args[10];
 		}
 	}
 	return 1;
