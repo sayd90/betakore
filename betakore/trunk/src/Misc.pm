@@ -3940,14 +3940,6 @@ sub checkSelfCondition {
 		return 0 unless ($char->{sp} >= $skill->getSP($config{$prefix . "_lvl"} || $char->getSkillLevel($skill)));
 	}
 	
-	# TODO: finish this
-	# if (defined $config{$prefix . "_onConfigKey"}) {
-		# foreach my $input (split / *, */, $config{$prefix."_onConfigKey"}) {
-			# my ($key, $value) = $input =~ /(\S+) (\S+)$/;
- 			# return 0 if ($config{$key} ne $value);
-		# }
-	# }
-	
 	if (defined $config{$prefix . "_skill"}) {
 		foreach my $input (split / *, */, $config{$prefix."_skill"}) {
 			my ($skillName, $reqLevel) = $input =~ /(.*?)(?:\s+([><]=? *\d+))?$/;
@@ -4278,11 +4270,6 @@ sub checkPlayerCondition {
 
 sub checkMonsterCondition {
 	my ($prefix, $monster) = @_;
-	if ($config{$prefix."_back"}) {
-		
-		return 0 unless isBack($monster);
-	}
-
 
 	if ($config{$prefix . "_hp"}) {
 		return 0 if (!$monster->{hp});
@@ -4333,8 +4320,7 @@ sub checkMonsterCondition {
 	if ($config{$prefix."_whenShieldEquipped"}) {
 		return 0 unless $monster->{shield};
 	}
-	
-	
+
 	my %args = (
 		monster => $monster,
 		prefix => $prefix,
@@ -4343,71 +4329,6 @@ sub checkMonsterCondition {
 
 	Plugins::callHook('checkMonsterCondition', \%args);
 	return $args{return};
-}
-
-sub isBack {
-	my $monster = shift;
-	my $me = $char->{look}{body};
-	my $mob = $monster->{look}{body};
-	Log::warning("Me: $me, Mob: $mob\n");
-	# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
-	my $diff = abs($me - $mob);
-	if ($diff > 4) {
-		$diff = 8 - $diff;
-	}
-	if ($diff <= 2) {
-		# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
-		return 1;
-	}
-		return 0;
-=pod
-	my $monster = shift;
-	my $me = $char->{look}{body};
-	my $mob = $monster->{look}{body} % 8;
-	Log::warning("Me: $me, Mob: $mob\n");
-	return 1 if ($me = 0 && ($mob == 7 || $mob == 1 || $mob == 0));
-	return 1 if ($me = 1 && ($mob == 0 || $mob == 2 || $mob == 1));
-	return 1 if ($me = 2 && ($mob == 1 || $mob == 3 || $mob == 2));
-	return 1 if ($me = 3 && ($mob == 2 || $mob == 4 || $mob == 3));
-	return 1 if ($me = 4 && ($mob == 3 || $mob == 5 || $mob == 4));
-	return 1 if ($me = 5 && ($mob == 4 || $mob == 6 || $mob == 5));
-	return 1 if ($me = 6 && ($mob == 5 || $mob == 7 || $mob == 6));
-	return 1 if ($me = 7 && ($mob == 6 || $mob == 0 || $mob == 7));
-	return 0;
-=cut 
-	
-=pod
-	my $monster = shift;
-	my $pos = calcPosition($monster);
-	my $mypos = calcPosition($char);
-	
-	my %vecMobToYou;
-	getVector(\%vecMobToYou, $mypos, $pos);
-	my $degMobToYou = vectorToDegree(\%vecMobToYou);
-	
-	Log::warning ("degMobToYou: $degMobToYou\n");
-	if ($degMobToYou == 180) {
-	return 1;
-	}
-	return 0;
-	# if ($degMobToYou - 45 
-=cut
-	
-
-
-=pod
-	my $monster = shift;
-	my $me = $char->{look}{body};
-	my $mob = $monster->{look}{body};
-	
-	# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
-	
-	if (abs($me - $mob) <= 1) {
-		# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
-		return 1;
-	}
-		return 0;
-=cut
 }
 
 ##
