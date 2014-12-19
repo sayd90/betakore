@@ -56,6 +56,7 @@ use enum qw(
 	ERROR_ITEM
 	ERROR_SKILL
 	ERROR_TASK
+	ERROR_MAP
 );
 
 sub new {
@@ -93,15 +94,23 @@ sub new {
 	Scalar::Util::weaken($holder[0]);
 	$self->{hooks} = Plugins::addHooks(
 		['Network::Receive::map_changed', \&mapChange, \@holder], 
-		['packet/warp_portal_list', \&warpPortalList, \@holder]
+		['packet/warp_portal_list', \&warpPortalList, \@holder],
+		['packet/no_teleport', \&noTP, \@holder]
 	);
 	debug "Starting Teleport Task \n", 'teleport';
 	return $self;
 }
 
+sub noTP {
+	my (undef, undef, $holder) = @_;
+	my $self = $holder->[0];
+	$self->{mapError} = 1;
+}
+
 sub warpPortalList {
 	my (undef, undef, $holder) = @_;
 	my $self = $holder->[0];
+	debug "Got warp list", "Task::Teleport";
 	$timeout{'ai_teleport_delay'}{'time'} = time;
 	$self->{state} = GOT_WARP_LIST;
 	$self->{warpListOpen} = 1;
@@ -110,6 +119,7 @@ sub warpPortalList {
 sub DESTROY {
 	my ($self) = @_;
 	Plugins::delHooks($self->{hooks}) if $self->{hooks};
+	debug "Destroying Task::Teleport", "Task::Teleport";
 	$self->SUPER::DESTROY();
 }
 
@@ -187,6 +197,11 @@ sub iterate {
 			}
 		}
 	} elsif ($self->{state} == USE_TELEPORT) {
+		if ($self->{mapError}) {
+			# ESSE ERRO SÓ DÁ EM SKILL!
+			$self->setError(ERROR_MAP, "Task::Teleport unavailable area to teleport");
+			return;
+		}
 		if ($self->{method} == SKILL) {
 			if (!$self->getSubtask()) {
 				message "Creating skill task \n";
@@ -195,6 +210,7 @@ sub iterate {
 				my $task = new Task::UseSkill (
 					actor => $skill->getOwner,
 					skill => $skill,
+					priority => Task::HIGH_PRIORITY
 				);
 				$self->setSubtask($task);
 				$self->{skillTask} = $task;
