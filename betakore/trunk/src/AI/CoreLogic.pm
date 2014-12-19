@@ -1060,7 +1060,7 @@ sub processAutoStorage {
 		my $i;
 		Misc::checkValidity("AutoStorage part 1");
 		for ($i = 0; exists $config{"getAuto_$i"}; $i++) {
-			next unless ($config{"getAuto_$i"} && !$config{"getAuto_${i}_disabled"});
+			next unless ($config{"getAuto_$i"} && checkSelfCondition("getAuto_$i") && !$config{"getAuto_${i}_disabled"});
 			if ($storage{opened} && findKeyString(\%storage, "name", $config{"getAuto_$i"}) eq '') {
 				foreach (keys %items_lut) {
 					if ((lc($items_lut{$_}) eq lc($config{"getAuto_$i"})) && ($items_lut{$_} ne $config{"getAuto_$i"})) {
@@ -1132,7 +1132,7 @@ sub processAutoStorage {
 
 		my $do_route;
 
-		if (!$config{storageAuto_useChatCommand}) {
+		if (!$config{storageAuto_useChatCommand} && !$storage{opened}) {
 			# Stop if the specified NPC is invalid
 			$args->{npc} = {};
 			
@@ -1185,52 +1185,54 @@ sub processAutoStorage {
 		}
 		if (!$do_route) {
 			# Talk to NPC if we haven't done so
-			if (!defined($args->{sentStore})) {
-				if ($config{storageAuto_useChatCommand}) {
-					$messageSender->sendChat($config{storageAuto_useChatCommand});
-				} else {
-					if ($config{minStorageZeny}) {
-						if ($char->{zeny} < $config{minStorageZeny}) {
-							message "Not enough zeny for storageAuto sequence, aborting. \n", "error";
-							$args->{done} = 1;
-							return;
+			if (!$storage{opened}) {
+				if (!defined($args->{sentStore})) {
+					if ($config{storageAuto_useChatCommand}) {
+						$messageSender->sendChat($config{storageAuto_useChatCommand});
+					} else {
+						if ($config{minStorageZeny}) {
+							if ($char->{zeny} < $config{minStorageZeny}) {
+								message "Not enough zeny for storageAuto sequence, aborting. \n", "error";
+								$args->{done} = 1;
+								return;
+							}
 						}
-					}
-					
-					if ($config{'storageAuto_npc_type'} eq "" || $config{'storageAuto_npc_type'} eq "1") {
-						warning T("Warning storageAuto has changed. Please read News.txt\n") if ($config{'storageAuto_npc_type'} eq "");
-						$config{'storageAuto_npc_steps'} = "c r1 n";
-						debug "Using standard iRO npc storage steps.\n", "npc";
-					} elsif ($config{'storageAuto_npc_type'} eq "2") {
-						$config{'storageAuto_npc_steps'} = "c c r1 n";
-						debug "Using iRO comodo (location) npc storage steps.\n", "npc";
-					} elsif ($config{'storageAuto_npc_type'} eq "3") {
-						message T("Using storage steps defined in config.\n"), "info";
-					} elsif ($config{'storageAuto_npc_type'} ne "" && $config{'storageAuto_npc_type'} ne "1" && $config{'storageAuto_npc_type'} ne "2" && $config{'storageAuto_npc_type'} ne "3") {
-						error T("Something is wrong with storageAuto_npc_type in your config.\n");
+						
+						if ($config{'storageAuto_npc_type'} eq "" || $config{'storageAuto_npc_type'} eq "1") {
+							warning T("Warning storageAuto has changed. Please read News.txt\n") if ($config{'storageAuto_npc_type'} eq "");
+							$config{'storageAuto_npc_steps'} = "c r1 n";
+							debug "Using standard iRO npc storage steps.\n", "npc";
+						} elsif ($config{'storageAuto_npc_type'} eq "2") {
+							$config{'storageAuto_npc_steps'} = "c c r1 n";
+							debug "Using iRO comodo (location) npc storage steps.\n", "npc";
+						} elsif ($config{'storageAuto_npc_type'} eq "3") {
+							message T("Using storage steps defined in config.\n"), "info";
+						} elsif ($config{'storageAuto_npc_type'} ne "" && $config{'storageAuto_npc_type'} ne "1" && $config{'storageAuto_npc_type'} ne "2" && $config{'storageAuto_npc_type'} ne "3") {
+							error T("Something is wrong with storageAuto_npc_type in your config.\n");
+						}
+
+						ai_talkNPC($args->{npc}{pos}{x}, $args->{npc}{pos}{y}, $config{'storageAuto_npc_steps'});
 					}
 
-					ai_talkNPC($args->{npc}{pos}{x}, $args->{npc}{pos}{y}, $config{'storageAuto_npc_steps'});
+					delete $ai_v{temp}{storage_opened};
+					$args->{sentStore} = 1;
+
+					# NPC talk retry
+					$AI::Timeouts::storageOpening = time;
+					$timeout{'ai_storageAuto'}{'time'} = time;
+					return;
 				}
 
-				delete $ai_v{temp}{storage_opened};
-				$args->{sentStore} = 1;
+				if (!defined $ai_v{temp}{storage_opened}) {
+					# NPC talk retry
+					if (timeOut($AI::Timeouts::storageOpening, 40)) {
+						undef $args->{sentStore};
+						debug "Retry talking to autostorage NPC.\n", "npc";
+					}
 
-				# NPC talk retry
-				$AI::Timeouts::storageOpening = time;
-				$timeout{'ai_storageAuto'}{'time'} = time;
-				return;
-			}
-
-			if (!defined $ai_v{temp}{storage_opened}) {
-				# NPC talk retry
-				if (timeOut($AI::Timeouts::storageOpening, 40)) {
-					undef $args->{sentStore};
-					debug "Retry talking to autostorage NPC.\n", "npc";
+					# Storage not yet opened; stop and wait until it's open
+					return;
 				}
-
-				# Storage not yet opened; stop and wait until it's open
-				return;
 			}
 			
 			my %pluginArgs;
@@ -1253,10 +1255,11 @@ sub processAutoStorage {
 					my $item = $char->inventory->getItems()->[$i];
 					next if $item->{equipped};
 					next if ($item->{broken} && $item->{type} == 7); # dont store pet egg in use
-					if ($args->{lastItemID} == $item->{nameID}) {
+					if ($args->{lastItemID} == $item->{nameID} && $args->{lastStorageSize} == @{$char->inventory->getItems()}) {
 						# We cannot store this item
 						$args->{retry}++;
 						if ($args->{retry} >= 2) {
+							debug "AUTOSTORAGE: marking $item->{name} as unstorageable\n", "storage";
 							$item->{unstorageable} = 1; # this will be reset once we change maps. We do this to prevent "storage full" error from triggering
 							next;
 						}
@@ -1264,20 +1267,30 @@ sub processAutoStorage {
 						$args->{retry} = 0;
 					}
 					
-					my $control = items_control($item->{name});
+					my $item_name = itemName($item, {no_broken => 1});
+					my $control = items_control($item_name);
+					my $total_amount = $char->inventory->sumByName($item_name); # total amount of the same name items
 
-					debug "AUTOSTORAGE: $item->{name} x $item->{amount} - store = $control->{storage}, keep = $control->{keep}\n", "storage";
-					if ($control->{storage} && $item->{amount} > $control->{keep}) {
+					debug "AUTOSTORAGE: $item->{name} x $item->{amount} ($total_amount stacked) - store = $control->{storage}, keep = $control->{keep}\n", "storage";
+					if ($control->{storage} && $total_amount > $control->{keep}) {
 						if ($args->{lastIndex} == $item->{index} &&
-						    timeOut($timeout{'ai_storageAuto_giveup'})) {
+							timeOut($timeout{'ai_storageAuto_giveup'})) {
 							return;
 						} elsif ($args->{lastIndex} != $item->{index}) {
 							$timeout{ai_storageAuto_giveup}{time} = time;
 						}
+						my $amount_to_store;
+						if ($total_amount != $item->{amount}) {
+							my $real_store = $total_amount - $control->{keep};
+							$amount_to_store = ($real_store > $item->{amount})?$item->{amount}:$real_store;
+						} else {
+							$amount_to_store = $item->{amount} - $control->{keep};
+						}
 						undef $args->{done};
 						$args->{lastIndex} = $item->{index};
 						$args->{lastItemID} = $item->{nameID};
-						$messageSender->sendStorageAdd($item->{index}, $item->{amount} - $control->{keep});
+						$args->{lastStorageSize} = @{$char->inventory->getItems()};
+						$messageSender->sendStorageAdd($item->{index}, $amount_to_store);
 						$timeout{ai_storageAuto}{time} = time;
 						$args->{nextItem} = $i;
 						return;
@@ -1292,7 +1305,7 @@ sub processAutoStorage {
 					my $item = $cart{inventory}[$i];
 					next unless ($item && %{$item});
 
-					my $control = items_control($item->{name});
+					my $control = items_control(itemName($item, {no_broken => 1}));
 
 					debug "AUTOSTORAGE (cart): $item->{name} x $item->{amount} - store = $control->{storage}, keep = $control->{keep}\n", "storage";
 					# store from cart as well as inventory if the flag is equal to 2
@@ -1341,7 +1354,7 @@ sub processAutoStorage {
 
 					my %item;
 					my $itemName = $config{"getAuto_$args->{index}"};
-					if (!$itemName) {
+					if (!$itemName || !checkSelfCondition("getAuto_$args->{index}"))  {
 						$args->{index}++;
 						next;
 					}
@@ -1375,6 +1388,7 @@ sub processAutoStorage {
 
 					if ($item{storage}{amount} < $item{amount_needed}) {
 						warning TF("storage: %s out of stock\n", $item{name});
+						Plugins::callHook("storage_out_of_stock");
 						if ($item{dcOnEmpty}) {
 							debug TF("Disconnecting on empty %s!\n", $item{name});
 							$char->{dcOnEmptyItems} .= "," if ($char->{dcOnEmptyItems} ne "");
@@ -1404,6 +1418,7 @@ sub processAutoStorage {
 			$messageSender->sendStorageClose() unless $config{storageAuto_keepOpen};
 			if (percent_weight($char) >= $config{'itemsMaxWeight_sellOrStore'} && ai_storageAutoCheck() && (AI::args->{forcedBySell} || !$config{sellAuto})) {
 				error T("Character is still overweight after storageAuto (storage is full?)\n");
+				Plugins::callHook("storage_still_full");
 				if ($config{dcOnStorageFull}) {
 					error T("Disconnecting on storage full!\n");
 					chatLog("k", T("Disconnecting on storage full!\n"));
@@ -1522,7 +1537,7 @@ sub processAutoSell {
 				next if ($item->{equipped});
 				next if ($items_sellable{$item->{nameID}} == 0);
 
-				my $control = items_control($item->{name});
+				my $control = items_control(itemName($item, {no_broken => 1}));
 
 				if ($control->{'sell'} && $item->{'amount'} > $control->{keep}) {
 					if ($args->{lastIndex} ne "" && $args->{lastIndex} == $item->{index} && timeOut($timeout{'ai_sellAuto_giveup'})) {
@@ -1776,7 +1791,7 @@ sub processAutoCart {
 				foreach my $item (@{$char->inventory->getItems()}) {
 					next if ($item->{broken} && $item->{type} == 7); # dont auto-cart add pet eggs in use
 					next if ($item->{equipped});
-					my $control = items_control($item->{name});
+					my $control = items_control(itemName($item, {no_broken => 1}));
 					if ($control->{cart_add} && $item->{amount} > $control->{keep}) {
 						my %obj;
 						$obj{index} = $item->{invIndex};
@@ -1792,7 +1807,7 @@ sub processAutoCart {
 			for (my $i = 0; $i < $max; $i++) {
 				my $cartItem = $cartInventory->[$i];
 				next unless ($cartItem);
-				my $control = items_control($cartItem->{name});
+				my $control = items_control(itemName($cartItem, {no_broken => 1}));
 				next unless ($control->{cart_get});
 
 				my $item = $char->inventory->getByName($cartItem->{name});
@@ -2988,7 +3003,7 @@ sub processAutoTeleport {
 	  && !$char->{dead}
 	) {
 		message T("Teleporting due to insufficient HP/SP or too many aggressives\n"), "teleport";
-		$ai_v{temp}{clear_aiQueue} = 1 if (useTeleport(1));
+		$ai_v{temp}{clear_aiQueue} = 1 if (useTeleport(1)); # TODO: this is breaking macros, manual moves and everything else.
 		$timeout{ai_teleport_hp}{time} = time;
 		return;
 	}
