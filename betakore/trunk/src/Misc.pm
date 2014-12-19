@@ -1787,14 +1787,14 @@ sub itemNameSimple {
 }
 
 ##
-# itemName($item)
+# itemName($item, [options])
 #
 # Resolve the name of an item. $item should be a hash with these keys:
 # nameID  => integer index into %items_lut
 # cards   => 8-byte binary data as sent by server
 # upgrade => integer upgrade level
 sub itemName {
-	my $item = shift;
+	my ($item, $options) = @_;
 
 	my $name = itemNameSimple($item->{nameID});
 
@@ -1845,12 +1845,12 @@ sub itemName {
 	my $numSlots = $itemSlotCount_lut{$item->{nameID}} if ($prefix eq "");
 
 	my $display = "";
-	$display .= "BROKEN " if $item->{broken};
-	$display .= "+$item->{upgrade} " if $item->{upgrade};
+	$display .= "BROKEN " if ($item->{broken} && !$options->{no_broken});
+	$display .= "+$item->{upgrade} " if ($item->{upgrade} && !$options->{no_upgrade});
 	$display .= $prefix if $prefix;
 	$display .= $name;
 	$display .= " [$suffix]" if $suffix;
-	$display .= " [$numSlots]" if $numSlots;
+	$display .= " [$numSlots]" if ($numSlots && !$options->{no_slots});
 
 	return $display;
 }
@@ -3249,7 +3249,7 @@ sub getBestTarget {
 				|| ($control->{attack_sp}  ne "" && $control->{attack_sp} > $char->{sp})
 				|| ($control->{attack_auto} == 3 && ($monster->{dmgToYou} || $monster->{missedYou} || $monster->{dmgFromYou}))
 				|| ($control->{attack_auto} == 0 && !($monster->{dmgToYou} || $monster->{missedYou}))
-				|| ($control->{prevent_assist} ne "" && checkVisibleMonsterQuantity($monster->{nameID}) > $control->{prevent_assist})
+				|| ($control->{prevent_assist} && $control->{prevent_assist} ne "" && checkAssistQuantity($monster->{nameID}) > $control->{prevent_assist})
 			);
 		}
 		if ($config{'attackCanSnipe'}) {
@@ -3821,6 +3821,7 @@ sub checkSelfCondition {
 	my $prefix = shift;
 	return 0 if (!$prefix);
 	return 0 if ($config{$prefix . "_disabled"});
+	# return 0 if ($taskManager->isMutexActive('teleport') || !$taskManager->countTasksByName('Teleport'));
 
 	return 0 if $config{$prefix."_whenIdle"} && !AI::isIdle();
 
@@ -3849,6 +3850,14 @@ sub checkSelfCondition {
 		} else {
 			return 0 if (!inRange($char->{sp}, $config{$prefix."_sp"}));
 		}
+	}
+	
+	if ($config{$prefix."_base_lv"}) {
+		return 0 if (!inRange($char->{'lv'}, $config{$prefix."_base_lv"}));
+	}
+	
+	if ($config{$prefix."_job_lv"}) {
+		return 0 if (!inRange($char->{'lv_job'}, $config{$prefix."_job_lv"}));
 	}
 
 	if ($config{$prefix."_weight"}) {
@@ -3930,6 +3939,14 @@ sub checkSelfCondition {
 						);
 		return 0 unless ($char->{sp} >= $skill->getSP($config{$prefix . "_lvl"} || $char->getSkillLevel($skill)));
 	}
+	
+	# TODO: finish this
+	# if (defined $config{$prefix . "_onConfigKey"}) {
+		# foreach my $input (split / *, */, $config{$prefix."_onConfigKey"}) {
+			# my ($key, $value) = $input =~ /(\S+) (\S+)$/;
+ 			# return 0 if ($config{$key} ne $value);
+		# }
+	# }
 	
 	if (defined $config{$prefix . "_skill"}) {
 		foreach my $input (split / *, */, $config{$prefix."_skill"}) {
@@ -4103,11 +4120,11 @@ sub checkSelfCondition {
 	return 1;
 }
 
-sub checkVisibleMonsterQuantity {
+sub checkAssistQuantity {
 	my ($monID) = @_;
 	my $count = 0;
 	foreach my $monster (@{$monstersList->getItems()}) {
-		if ($monster->{nameID} == $monID) {
+		if ($monster->{nameID} == $monID && checkMonsterCleanness($monster)) {
 			$count++;
 		}
 	}
@@ -4261,6 +4278,11 @@ sub checkPlayerCondition {
 
 sub checkMonsterCondition {
 	my ($prefix, $monster) = @_;
+	if ($config{$prefix."_back"}) {
+		
+		return 0 unless isBack($monster);
+	}
+
 
 	if ($config{$prefix . "_hp"}) {
 		return 0 if (!$monster->{hp});
@@ -4311,7 +4333,8 @@ sub checkMonsterCondition {
 	if ($config{$prefix."_whenShieldEquipped"}) {
 		return 0 unless $monster->{shield};
 	}
-
+	
+	
 	my %args = (
 		monster => $monster,
 		prefix => $prefix,
@@ -4320,6 +4343,71 @@ sub checkMonsterCondition {
 
 	Plugins::callHook('checkMonsterCondition', \%args);
 	return $args{return};
+}
+
+sub isBack {
+	my $monster = shift;
+	my $me = $char->{look}{body};
+	my $mob = $monster->{look}{body};
+	Log::warning("Me: $me, Mob: $mob\n");
+	# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
+	my $diff = abs($me - $mob);
+	if ($diff > 4) {
+		$diff = 8 - $diff;
+	}
+	if ($diff <= 2) {
+		# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
+		return 1;
+	}
+		return 0;
+=pod
+	my $monster = shift;
+	my $me = $char->{look}{body};
+	my $mob = $monster->{look}{body} % 8;
+	Log::warning("Me: $me, Mob: $mob\n");
+	return 1 if ($me = 0 && ($mob == 7 || $mob == 1 || $mob == 0));
+	return 1 if ($me = 1 && ($mob == 0 || $mob == 2 || $mob == 1));
+	return 1 if ($me = 2 && ($mob == 1 || $mob == 3 || $mob == 2));
+	return 1 if ($me = 3 && ($mob == 2 || $mob == 4 || $mob == 3));
+	return 1 if ($me = 4 && ($mob == 3 || $mob == 5 || $mob == 4));
+	return 1 if ($me = 5 && ($mob == 4 || $mob == 6 || $mob == 5));
+	return 1 if ($me = 6 && ($mob == 5 || $mob == 7 || $mob == 6));
+	return 1 if ($me = 7 && ($mob == 6 || $mob == 0 || $mob == 7));
+	return 0;
+=cut 
+	
+=pod
+	my $monster = shift;
+	my $pos = calcPosition($monster);
+	my $mypos = calcPosition($char);
+	
+	my %vecMobToYou;
+	getVector(\%vecMobToYou, $mypos, $pos);
+	my $degMobToYou = vectorToDegree(\%vecMobToYou);
+	
+	Log::warning ("degMobToYou: $degMobToYou\n");
+	if ($degMobToYou == 180) {
+	return 1;
+	}
+	return 0;
+	# if ($degMobToYou - 45 
+=cut
+	
+
+
+=pod
+	my $monster = shift;
+	my $me = $char->{look}{body};
+	my $mob = $monster->{look}{body};
+	
+	# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
+	
+	if (abs($me - $mob) <= 1) {
+		# Log::warning ("$me, $mob, ".int($me - $mob)."\n");
+		return 1;
+	}
+		return 0;
+=cut
 }
 
 ##
@@ -4439,6 +4527,7 @@ sub openShop {
 	@shopnames = split(/;;/, $shop{title_line});
 	$shop{title} = $shopnames[int rand($#shopnames + 1)];
 	$shop{title} = ($config{shopTitleOversize}) ? $shop{title} : substr($shop{title},0,36);
+	$ai_v{'cart_time'} = time + 2;
 	$messageSender->sendOpenShop($shop{title}, \@items);
 	message T("Trying to set up shop...\n"), "vending";
 	$shopstarted = 1;
