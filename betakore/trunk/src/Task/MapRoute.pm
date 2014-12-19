@@ -211,6 +211,7 @@ sub iterate {
 			$self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
 
 			if ($self->{teleport} && !$field->isCity
+			&& (!$config{route_teleport_minSp} || $char->hp_percent > $config{route_teleport_minSp})
 			&& !existsInList($config{route_teleport_notInMaps}, $field->baseName)
 			&& ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
 				my $minDist = $config{route_teleport_minDistance};
@@ -339,6 +340,7 @@ sub iterate {
 			$self->{teleport} = $config{route_teleport} if (!defined $self->{teleport});
 
 			if ($self->{teleport} && !$field->isCity
+			&& (!$config{route_teleport_minSp} || $char->hp_percent > $config{route_teleport_minSp})
 			&& !existsInList($config{route_teleport_notInMaps}, $field->baseName)
 			&& ( !$config{route_teleport_maxTries} || $self->{teleportTries} <= $config{route_teleport_maxTries} )) {
 				my $minDist = $config{route_teleport_minDistance};
