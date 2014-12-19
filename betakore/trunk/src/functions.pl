@@ -52,6 +52,11 @@ use constant {
 
 our $state;
 
+# is this right? seems hackish....
+$SIG{INT} = $SIG{HUP} = $SIG{KILL} = $SIG{TERM} = $SIG{QUIT} = sub {
+	Misc::quit();
+};
+
 sub mainLoop {
 	Benchmark::begin('mainLoop') if DEBUG;
 	$state = STATE_LOAD_PLUGINS if (!defined $state);
