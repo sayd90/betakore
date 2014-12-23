@@ -649,9 +649,12 @@ sub cmdAuthorize {
 }
 
 sub cmdAutoBuy {
-	message T("Initiating auto-buy.\n");
-	return if (AI::inQueue("buyAuto"));
-	AI::queue("buyAuto");
+	if (!AI::inQueue("buyAuto")) {
+		message T("Initiating auto-buy.\n");
+		AI::queue("buyAuto");
+	} else {
+		error T("Auto-buy is already on course.\n");
+	}
 }
 
 sub cmdAutoSell {
@@ -677,9 +680,12 @@ sub cmdAutoSell {
 		}
 		message("-----------------------------------------------------------\n","list")
 	} elsif (!$arg) {
-		message T("Initiating auto-sell.\n");
-		return if (AI::inQueue("sellAuto"));
-		AI::queue("sellAuto");
+		if(!AI::inQueue("sellAuto")) {
+			message T("Initiating auto-sell.\n");
+			AI::queue("sellAuto");
+		} else {
+			error T("Auto-sell is already on course.\n");
+		}
 	}
 }
 
@@ -704,9 +710,12 @@ sub cmdAutoStorage {
 		}
 		message("-----------------------------------------------------------\n","list")
 	} elsif (!$arg) {
-		message T("Initiating auto-storage.\n");
-		return if (AI::inQueue("storageAuto"));
-		AI::queue("storageAuto");
+		if(!AI::inQueue("storageAuto")) {
+			message T("Initiating auto-storage.\n");
+			AI::queue("storageAuto");
+		} else {
+			error T("Auto-storage is already on course.\n");
+		}
 	}
 }
 
