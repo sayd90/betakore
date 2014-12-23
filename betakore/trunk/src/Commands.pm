@@ -650,6 +650,7 @@ sub cmdAuthorize {
 
 sub cmdAutoBuy {
 	message T("Initiating auto-buy.\n");
+	return if (AI::inQueue("buyAuto"));
 	AI::queue("buyAuto");
 }
 
@@ -677,6 +678,7 @@ sub cmdAutoSell {
 		message("-----------------------------------------------------------\n","list")
 	} elsif (!$arg) {
 		message T("Initiating auto-sell.\n");
+		return if (AI::inQueue("sellAuto"));
 		AI::queue("sellAuto");
 	}
 }
@@ -703,6 +705,7 @@ sub cmdAutoStorage {
 		message("-----------------------------------------------------------\n","list")
 	} elsif (!$arg) {
 		message T("Initiating auto-storage.\n");
+		return if (AI::inQueue("storageAuto"));
 		AI::queue("storageAuto");
 	}
 }
