@@ -65,7 +65,7 @@ sub new {
 	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport', 'movement'], priority => Task::HIGH_PRIORITY);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
-	$self->{giveup}{timeout} = $args{giveup_time} || 4;
+	$self->{giveup}{timeout} = $timeout{ai_teleport_giveup}{timeout} || $args{giveup_time} || 4;
 	$self->{giveup}{time} = time;
 	$self->{type} = $args{type};
 	if ($self->{type} == RANDOM) {
