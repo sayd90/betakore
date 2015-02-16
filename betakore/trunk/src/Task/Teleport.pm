@@ -62,7 +62,7 @@ use enum qw(
 sub new {
 	my $class = shift;
 	my %args = @_;
-	my $self = $class->SUPER::new(@_, autostop => 1, autofail => 0, mutexes => ['teleport', 'movement'], priority => Task::HIGH_PRIORITY);
+	my $self = $class->SUPER::new(@_, autostop => 0, autofail => 1, mutexes => ['teleport', 'skill', 'movement'], priority => Task::HIGH_PRIORITY);
 	$self->{emergency} = $args{emergency};
 	# $self->{retry}{timeout} = $timeout{ai_teleport_retry}{timeout} || 0.5; unused atm
 	$self->{giveup}{timeout} = $timeout{ai_teleport_giveup}{timeout} || $args{giveup_time} || 4;
@@ -89,6 +89,7 @@ sub new {
 	
 	$self->{startTime} = time;
 	$timeout{'ai_send_warp_tele_retry'}{'timeout'} = 0.3;
+	$timeout{'ai_send_warp_tele_retry'}{'time'} = time;
 	
 	my @holder = ($self);
 	Scalar::Util::weaken($holder[0]);
@@ -141,20 +142,23 @@ sub resume {
 
 sub iterate {
 	my ($self) = @_;
+	
 	return if (!$self->SUPER::iterate());
 	if ($self->{mapChange} || $net->getState() != Network::IN_GAME) {
-		$self->setDone();
+		
 		$self->{warpListOpen} = 0;
 		debug sprintf("Took %s seconds to teleport \n", (time - $self->{startTime})), "Task::Teleport";
+		$self->setDone();
 	} elsif (timeOut($self->{giveup}) && $self->{state} != STARTING) {
 		$messageSender->sendWarpTele(27, 'cancel');
+		debug "Task::Teleport timeout\n", "Task::Teleport";
 		$self->setError(ERROR_TASK, "Task::Teleport timeout");
 	} elsif ($self->{warpListOpen} && timeOut($timeout{ai_send_warp_tele_retry}) && (timeOut($timeout{ai_teleport_delay}) || $self->{emergency})) {
 		$self->{debugRetry}++;
 		debug sprintf("Trying to confirm teleport: attempt %s\n", $self->{debugRetry}), "Task::Teleport";
 		$timeout{ai_send_warp_tele_retry}{time} = time;
 		$messageSender->sendWarpTele(26, $self->{destMap});
-		$self->{warpListOpen} = 0;
+		# $self->{warpListOpen} = 0;
 		#$self->{state} = WAITING_FOR_MAPCHANGE;
 	} elsif ($self->{state} == STARTING) {
 		$self->{giveup}{time} = time;
