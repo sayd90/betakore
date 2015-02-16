@@ -5922,6 +5922,10 @@ sub warp_portal_list {
 			"list");
 	}
 	message("--------------------------------------------------\n", "list");
+	unless ($taskManager->isMutexActive('teleport')) {
+		debug "Cancelling unwanted teleport window \n", "teleport";
+		$messageSender->sendWarpTele(27, 'cancel'); 
+	}
 }
 
 
