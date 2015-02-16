@@ -2934,12 +2934,18 @@ sub updatePlayerNameCache {
 # level: 1 to teleport to a random spot, 2 to respawn.
 sub useTeleport {
 	my ($use_lvl, $internal, $emergency) = @_;
+	debug TF("useTeleport: %s active Teleport::Task \n", $taskManager->countTasksByName('Teleport')), "Task::Teleport";
 	if (!$taskManager->isMutexActive('teleport') && !$taskManager->countTasksByName('Teleport')) {
-		$taskManager->add(
-			Task::Teleport->new(useSkill => $config{teleportAuto_useSkill}, type => ($use_lvl - 1), emergency => $emergency)
-		);
+		if (($use_lvl == 2 && ($char->{skills}{AL_TELEPORT} || $char->inventory->getByNameID(602) || $char->inventory->getByNameID(12324))) 
+				|| ($use_lvl == 1 && ($char->{skills}{AL_TELEPORT} || $char->inventory->getByNameID(601)))) {
+			$taskManager->add(
+				Task::Teleport->new(useSkill => $config{teleportAuto_useSkill}, type => ($use_lvl - 1), emergency => $emergency)
+			);
+			
+			return 1;
+		}
 	}
-	
+	return 0;
 	# old code:
 =pod
 		
