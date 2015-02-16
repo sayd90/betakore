@@ -64,7 +64,7 @@ sub iterate {
 
 	Plugins::callHook('AI_pre/manual');
 	Benchmark::begin("AI (part 1)") if DEBUG;
-	return if processClientSuspend();
+	return if processClientSuspend() || $taskManager->isMutexActive('teleport');
 	Benchmark::begin("AI (part 1.1)") if DEBUG;
 	processLook();
 	$char->processTask('NPC');
@@ -73,7 +73,7 @@ sub iterate {
 	processEscapeUnknownMaps();
 	Benchmark::end("AI (part 1.1)") if DEBUG;
 	Benchmark::begin("AI (part 1.2)") if DEBUG;
-	$char->processTask("Teleport");
+	# $char->processTask("Teleport");
 	$char->processTask("sitting");
 	$char->processTask("standing");
 	AI::Attack::process();
@@ -1759,6 +1759,7 @@ sub processAutoBuy {
 			my $needbuy = $config{"buyAuto_$args->{index}"."_maxAmount"};
 			$needbuy -= $char->inventory->get($args->{invIndex})->{amount} if ($args->{invIndex} ne ""); # we don't need maxAmount if we already have a certain amount of the item in our inventory]
 			my $found;
+			message TF("Trying to buy %s %s \n", (($maxbuy > $needbuy) ? $needbuy : $maxbuy),  $config{"buyAuto_$args->{index}"});
 			for (my $i = 0; $i < @storeList; $i++) {
 				if ($storeList[$i]{'nameID'} == $args->{itemID}) {
 					$messageSender->sendBuyBulk([{itemID  => $args->{itemID}, amount => ($maxbuy > $needbuy) ? $needbuy : $maxbuy}]); # TODO: we could buy more types of items at once
