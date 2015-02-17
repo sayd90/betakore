@@ -197,14 +197,14 @@ sub iterate {
 			$self->{time} =  Time::HiRes::time + $timeResponse - 4;
 			Commands::run($command);
 			
-		} elsif ( $step =~ /c/i ) {
+		} elsif ( $step =~ /^c/i ) {
 			# Click Next.
 			if ($npcTalkType eq 'next') {
 				$messageSender->sendTalkContinue($talk{ID});
 			} else {
 				$self->setError(WRONG_NPC_INSTRUCTIONS,
-					T("According to the given NPC instructions, the Next button " .
-					"must now be clicked on, but that's not possible."));
+					TF("According to the given NPC instructions, the Next button " .
+					"must now be clicked on, but the NPC is expecting '%s' sequence.", ucfirst($npcTalkType)));
 				$self->cancelTalk();
 			}
 
@@ -215,6 +215,7 @@ sub iterate {
 			return;
 		} elsif ( $step =~ /^t=(.*)/i ) {
 			# Send NPC talk text.
+			Log::warning "Sending talk text \n";
 			$messageSender->sendTalkText($talk{ID}, $1);
 
 		} elsif ( $step =~ /d(\d+)/i ) {
