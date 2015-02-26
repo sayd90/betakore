@@ -1246,7 +1246,7 @@ sub processAutoStorage {
 				if(defined $storage{items_max} && @storageID >= $storage{items_max} && $config{'dcOnStorageFull'}) {
 					error T("Disconnecting because storage is full!\n");
 					chatLog("k", T("Disconnecting because storage is full!\n"));
-					quit();
+					($config{dcOnStorageFull} == 2) ? offlineMode() : quit();
 				}
 
 				# inventory to storage
@@ -2038,7 +2038,7 @@ sub processFollow {
 		return if ($rrr->getName() eq 'TalkNPC');
 	}
 	if($config{'sitAuto_follow'} && (percent_hp($char) < $config{'sitAuto_hp_lower'} || percent_sp($char) < $config{'sitAuto_sp_lower'}) && $field->isCity) {
-	my $action = AI::action;
+		my $action = AI::action;
 		if($action eq "sitting" && !$char->{sitting} && $char->{skills}{NV_BASIC}{lv} >= 3){
 			sit();
 		}
@@ -2321,12 +2321,12 @@ sub processSitAuto {
 	}
 
 	# Sit if we're not already sitting
-	if ($action eq "sitAuto" && !$char->{sitting} && $char->{skills}{NV_BASIC}{lv} >= 3 &&
+	if ($action eq "sitAuto" && !$char->{sitting} && $char->{skills}{NV_BASIC}{lv} >= 3 && !$char->statusActive('EFST_HIDING') &&
 	    !ai_getAggressives() && ($weight < 50 || $config{'sitAuto_over_50'})) {
 		debug "sitAuto - sit\n", "sitAuto";
 		sit();
 
-	} elsif ($action eq "sitAuto" && $ai_v{'sitAuto_forceStop'}) {
+	} elsif ($action eq "sitAuto" && ($ai_v{'sitAuto_forceStop'} || $char->statusActive('EFST_HIDING'))) {
 		AI::dequeue;
 		stand() if (!AI::isIdle && !AI::is(qw(follow sitting clientSuspend)) && !$config{'sitAuto_idle'} && $char->{sitting});
 
