@@ -1456,7 +1456,7 @@ sub cmdDeal {
 	} elsif (%incomingDeal && $arg[0] =~ /\d+/) {
 		error T("Error in function 'deal' (Deal a Player)\n" .
 			"You must first cancel the incoming deal\n");
-	} elsif ($arg[0] =~ /\d+/ && !$playersID[$arg[0]]) {
+	} elsif ($arg[0] =~ /\d+/ && ($arg[0] < 0 || !$playersID[$arg[0]])) {
 		error TF("Error in function 'deal' (Deal a Player)\n" .
 			"Player %s does not exist\n", $arg[0]);
 	} elsif ($arg[0] =~ /\d+/) {
