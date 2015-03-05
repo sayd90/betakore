@@ -3157,28 +3157,20 @@ sub party_chat {
 # TODO: itemPickup itemDivision
 sub party_exp {
 	my ($self, $args) = @_;
-	$char->{party}{share} = $args->{type};
-	if ($args->{type} == 0) {
-		message T("Party EXP set to Individual Take\n"), "party", 1;
-	} elsif ($args->{type} == 1) {
-		message T("Party EXP set to Even Share\n"), "party", 1;
-	} else {
-		error T("Error setting party option\n");
-	}
-	if ($args->{itemPickup} == 0) {
-		message T("Party item set to Individual Take\n"), "party", 1;
-	} elsif ($args->{itemPickup} == 1) {
-		message T("Party item set to Even Share\n"), "party", 1;
-	} else {
-		error T("Error setting party option\n");
-	}
-	if ($args->{itemDivision} == 0) {
-		message T("Party item division set to Individual Take\n"), "party", 1;
-	} elsif ($args->{itemDivision} == 1) {
-		message T("Party item division set to Even Share\n"), "party", 1;
-	} else {
-		error T("Error setting party option\n");
-	}
+	$char->{party}{share} = $args->{type}; # backwards compatible
+	$char->{party}{sharing}{exp} = defined $args->{type} ? $args->{type} : -1;
+	$char->{party}{sharing}{item}{pickup} = defined $args->{itemPickup} ? $args->{itemPickup} : -1;
+	$char->{party}{sharing}{item}{division} = defined $args->{itemDivision} ? $args->{itemDivision} : -1;
+	my %options = (
+		-1 => T("unknown"),
+		0 => T("individual"),
+		1 => T("even")
+	);
+	message TF("Party sharing: %s exp, %s item pickup, %s item division\n",
+			$options{$char->{party}{sharing}{exp}},
+			$options{$char->{party}{sharing}{item}{pickup}},
+			$options{$char->{party}{sharing}{item}{division}}
+		), "party", 1;
 }
 
 sub party_hp_info {
@@ -3300,8 +3292,12 @@ sub party_users_info {
 		$char->{party}{users}{$ID}->{ID} = $ID;
 		debug TF("Party Member: %s (%s)\n", $char->{party}{users}{$ID}{name}, $char->{party}{users}{$ID}{map}), "party", 1;
 	}
-
-	if (($config{partyAutoShare} || $config{partyAutoShareItem} || $config{partyAutoShareItemDiv}) && $char->{party} && %{$char->{party}} && $char->{party}{users}{$accountID}{admin}) {
+	if (
+			(
+				(($config{partyAutoShare} || 0) != $char->{party}{sharing}{exp})
+				|| (($config{partyAutoShareItem} || 0) != $char->{party}{sharing}{item}{pickup})
+				|| (($config{partyAutoShareItemDiv} || 0) != $char->{party}{sharing}{item}{division})
+			) && $char->{party} && %{$char->{party}} && $char->{party}{users}{$accountID}{admin}) {
 		$messageSender->sendPartyOption($config{partyAutoShare}, $config{partyAutoShareItem}, $config{partyAutoShareItemDiv});
 	}
 }

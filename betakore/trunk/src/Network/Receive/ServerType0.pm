@@ -1601,9 +1601,13 @@ sub party_join {
 	$char->{party}{users}{$ID}->{ID} = $ID;
 =cut
 
-	if (($config{partyAutoShare} || $config{partyAutoShareItem} || $config{partyAutoShareItemDiv}) && $char->{party} && %{$char->{party}} && $char->{party}{users}{$accountID}{admin}) {
+	if (
+			(
+				(($config{partyAutoShare} || 0) != $char->{party}{sharing}{exp})
+				|| (($config{partyAutoShareItem} || 0) != $char->{party}{sharing}{item}{pickup})
+				|| (($config{partyAutoShareItemDiv} || 0) != $char->{party}{sharing}{item}{division})
+			) && $char->{party} && %{$char->{party}} && $char->{party}{users}{$accountID}{admin}) {
 		$messageSender->sendPartyOption($config{partyAutoShare}, $config{partyAutoShareItem}, $config{partyAutoShareItemDiv});
-
 	}
 }
 
