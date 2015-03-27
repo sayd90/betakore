@@ -3002,9 +3002,17 @@ sub cmdInventory {
 	} elsif ($arg1 eq "desc" && $arg2 ne "") {
 		cmdInventory_desc($arg2);
 
+	} elsif ($arg1 eq "log") {
+		open('FH','>:utf8',$Settings::logs_folder.'/inventory_'. $config{username} .'_'. $config{char} .'.txt');
+		print FH TF("Inventory list for %s:\n",$char->{name});		
+		foreach my $item (@{$char->inventory->getItems()}) {
+			$item->{name} .= " -- ". TF("Not Identified") unless ($item->{identified});
+			printf(FH "%-3d %s x %d\n",$item->{invIndex},$item->{name},$item->{amount});
+		}
+		close(FH);
 	} else {
 		error T("Syntax Error in function 'i' (Inventory List)\n" .
-			"Usage: i [<u|eq|neq|nu|desc>] [<inventory item>]\n");
+			"Usage: i [<u|eq|neq|nu|desc|log>] [<inventory item>]\n");
 	}
 }
 
