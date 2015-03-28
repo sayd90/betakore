@@ -61,7 +61,7 @@ sub _ne {
 	return !&_eq;
 }
 
-
+# The same list as %equipSlot_lut, but sorted to make sense to a human.
 our @slots = qw(
 	topHead midHead lowHead
 	leftHand rightHand
@@ -70,6 +70,9 @@ our @slots = qw(
 	arrow
 	costumeTopHead costumeMidHead costumeLowHead
 	costumeRobe costumeFloor
+	
+	shadowLeftHand shadowRightHand shadowArmor shadowShoes
+	shadowLeftAccessory shadowRightAccessory
 );
 
 

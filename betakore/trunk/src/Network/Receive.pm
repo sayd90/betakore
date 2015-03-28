@@ -2177,7 +2177,7 @@ sub emoticon {
 sub equip_item {
 	my ($self, $args) = @_;
 	my $item = $char->inventory->getByServerIndex($args->{index});
-	if (!$args->{success}) {
+	if ((!$args->{success} & $args->{switch} eq "00AA") || ($args->{success} & $args->{switch} eq "0999")) {
 		message TF("You can't put on %s (%d)\n", $item->{name}, $item->{invIndex});
 	} else {
 		$item->{equipped} = $args->{type};
@@ -4690,6 +4690,35 @@ sub storage_item_removed {
 	}
 }
 
+sub character_equip {
+	my ($self, $args) = @_;
+
+	my @items;
+	$self->_items_list({
+		class => 'Actor::Item',
+		hook => 'packet_character_equip',
+		debug_str => 'Other Character Equipment',
+		items => [$self->parse_items_nonstackable($args)],
+		adder => sub { push @items, $_[0] },
+	});
+
+	# Sort items by the rough order they'd show up in the official client.
+	my @bits = qw( 8 9 0 10 11 12 4 2 1 5 6 3 7 );
+	foreach my $item ( @items ) {
+		$item->{sort} |= ( ( $item->{equipped} >> $bits[$_] ) & 1 ) << $_ foreach 0 .. $#bits;
+	}
+
+	my $w = 0;
+	$w = max( $w, length $_ ) foreach values %equipTypes_lut;
+
+	my $msg = '';
+	$msg .= T("---------Equipment List--------\n");
+	$msg .= "Name: $args->{name}\n";
+	$msg .= TF("%-${w}s : %s\n", $equipTypes_lut{$_->{equipped}}, $_->{name}) foreach sort { $a->{sort} <=> $b->{sort} } @items;
+	$msg .= "-------------------------------\n";
+	message($msg, "list");
+}
+
 sub storage_items_nonstackable {
 	my ($self, $args) = @_;
 
@@ -6209,15 +6238,16 @@ sub login_pin_new_code_result {
 	}
 }
 
-#08FF
-sub actor_status_active2 {
+sub actor_status_active {
 	my ($self, $args) = @_;
-	return unless Network::Receive::changeToInGameState();
-	my ($type, $ID, $tick, $unknown1, $unknown2, $unknown3) = @{$args}{qw(type ID tick unknown1 unknown2 unknown3)};
+	return unless changeToInGameState();
+	my ($type, $ID, $tick, $unknown1, $unknown2, $unknown3, $unknown4) = @{$args}{qw(type ID tick unknown1 unknown2 unknown3 unknown4)};
+	my $flag = (exists $args->{flag}) ? $args->{flag} : 1;
 	my $status = defined $statusHandle{$type} ? $statusHandle{$type} : "UNKNOWN_STATUS_$type";
 	$cart{type} = $unknown1 if ($type == 673 && defined $unknown1 && ($ID eq $accountID)); # for Cart active
 	$args->{skillName} = defined $statusName{$status} ? $statusName{$status} : $status;
-	($args->{actor} = Actor::get($ID))->setStatus($status, 1, $tick == 9999 ? undef : $tick, $args->{unknown1});
+	#($args->{actor} = Actor::get($ID))->setStatus($status, 1, $tick == 9999 ? undef : $tick, $args->{unknown1}); # need test for '08FF'
+	($args->{actor} = Actor::get($ID))->setStatus($status, $flag, $tick == 9999 ? undef : $tick);
 }
 
 

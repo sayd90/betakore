@@ -514,6 +514,7 @@ sub new {
 		'0857' => ['actor_exists', 'v C a4 v3 V v11 a4 a2 v V C2 a3 C3 v2 Z*', [qw(len object_type ID walk_speed opt1 opt2 option type hair_style weapon shield lowhead tophead midhead hair_color clothes_color head_dir costume guildID emblemID manner opt3 stance sex coords xSize ySize act lv font name)]], # -1 # spawning provided by try71023
 		'0858' => ['actor_connected', 'v C a4 v3 V v11 a4 a2 v V C2 a3 C2 v2 Z*', [qw(len object_type ID walk_speed opt1 opt2 option type hair_style weapon shield lowhead tophead midhead hair_color clothes_color head_dir costume guildID emblemID manner opt3 stance sex coords xSize ySize lv font name)]], # -1 # standing provided by try71023
 		'0859' => ['show_eq', 'v Z24 v7 v C a*', [qw(len name jobID hair_style tophead midhead lowhead robe hair_color clothes_color sex equips_info)]],
+		'08B3' => ['show_script', 'v a4', [qw(len ID)]],
 		#'08B9' => ['account_id', 'x4 V v', [qw(accountID unknown)]], # len: 12 Conflict with the struct (found in twRO 29032013)
 		'08B9' => ['login_pin_code_request', 'V a4 v', [qw(seed accountID flag)]],
 		'08BB' => ['login_pin_new_code_result', 'v V', [qw(flag seed)]],
@@ -523,19 +524,34 @@ sub new {
 		'08CB' => ['rates_info', 's4 a*', [qw(len exp death drop detail)]],
 		'08CF' => ['revolving_entity', 'a4 v v', [qw(sourceID type entity)]],
 		'08D2' => ['high_jump', 'a4 v2', [qw(ID x y)]],
-		'08FF' => ['actor_status_active2', 'a4 v V4', [qw(ID type tick unknown1 unknown2 unknown3)]],
+		'08FF' => ['actor_status_active', 'a4 v V4', [qw(ID type tick unknown1 unknown2 unknown3)]],
 		'0900' => ['inventory_items_stackable', 'v a*', [qw(len itemInfo)]],
 		'0901' => ['inventory_items_nonstackable', 'v a*', [qw(len itemInfo)]],
 		'0902' => ['cart_items_stackable', 'v a*', [qw(len itemInfo)]],
 		'0903' => ['cart_items_nonstackable', 'v a*', [qw(len itemInfo)]],
+		'0906' => ['character_equip', 'v Z24 x17 a*', [qw(len name itemInfo)]],
+		'090F' => ['actor_connected', 'v C a4 v3 V v11 a4 a2 v V C2 a3 C2 v2 a9 Z*', [qw(len object_type ID walk_speed opt1 opt2 option type hair_style weapon shield lowhead tophead midhead hair_color clothes_color head_dir costume guildID emblemID manner opt3 stance sex coords xSize ySize lv font opt4 name)]],
+		'0914' => ['actor_moved', 'v C a4 v3 V v5 a4 v6 a4 a2 v V C2 a6 C2 v2 a9 Z*', [qw(len object_type ID walk_speed opt1 opt2 option type hair_style weapon shield lowhead tick tophead midhead hair_color clothes_color head_dir costume guildID emblemID manner opt3 stance sex coords xSize ySize lv font opt4 name)]],
+		'0915' => ['actor_exists', 'v C a4 v3 V v11 a4 a2 v V C2 a3 C3 v2 a9 Z*', [qw(len object_type ID walk_speed opt1 opt2 option type hair_style weapon shield lowhead tophead midhead hair_color clothes_color head_dir costume guildID emblemID manner opt3 stance sex coords xSize ySize act lv font opt4 name)]],
 		'0975' => ['storage_items_stackable', 'v Z24 a*', [qw(len title itemInfo)]],
 		'0976' => ['storage_items_nonstackable', 'v Z24 a*', [qw(len title itemInfo)]],
 		'0977' => ['monster_hp_info', 'a4 V V', [qw(ID hp hp_max)]],
 		'097A' => ['quest_all_list2', 'v3 a*', [qw(len count unknown message)]],
-		'09A0' => ['sync_received_characters', 'V', [qw(sync_Count)]],
+		'097B' => ['rates_info2', 's V3 a*', [qw(len exp death drop detail)]],
+		'0990' => ['inventory_item_added', 'v3 C3 a8 V C2 a4 v', [qw(index amount nameID identified broken upgrade cards type_equip type fail expire unknown)]],
+		'0991' => ['inventory_items_stackable', 'v a*', [qw(len itemInfo)]],
+		'0992' => ['inventory_items_nonstackable', 'v a*', [qw(len itemInfo)]],
+		'0993' => ['cart_items_stackable', 'v a*', [qw(len itemInfo)]],
+		'0994' => ['cart_items_nonstackable', 'v a*', [qw(len itemInfo)]],
+		'0995' => ['storage_items_stackable', 'v Z24 a*', [qw(len title itemInfo)]],
+		'0996' => ['storage_items_nonstackable', 'v Z24 a*', [qw(len title itemInfo)]],
+		'0997' => ['character_equip', 'v Z24 x17 a*', [qw(len name itemInfo)]],
+		'0999' => ['equip_item', 'v V v C', [qw(index type viewID success)]], #11
+		'099A' => ['unequip_item', 'v V C', [qw(index type success)]],#9
 		'099B' => ['map_property3', 'v a4', [qw(type info_table)]],
 		'099D' => ['received_characters', 'v a*', [qw(len charInfo)]],
 		'099F' => ['area_spell_multiple2', 'v a*', [qw(len spellInfo)]], # -1
+		'09A0' => ['sync_received_characters', 'V', [qw(sync_Count)]],
 		'09CF' => ['gameguard_request'],
 		'0A27' => ['hp_sp_changed', 'v2', [qw(type amount)]]
 	};
@@ -568,6 +584,11 @@ sub new {
 				types => 'v2 C v2 C a8 l v2 C',
 				keys => [qw(index nameID type type_equip equipped upgrade cards expire bindOnEquipType sprite_id identified)],
 			},
+			type6 => {
+				len => 31,
+				types => 'v2 C V2 C a8 l v2 C',
+				keys => [qw(index nameID type type_equip equipped upgrade cards expire bindOnEquipType sprite_id identified)],
+			},
 		},
 		items_stackable => {
 			type1 => {
@@ -588,6 +609,11 @@ sub new {
 			type5 => {
 				len => 22,
 				types => 'v2 C v2 a8 l C',
+				keys => [qw(index nameID type amount type_equip cards expire identified)],
+			},
+			type6 => {
+				len => 24,
+				types => 'v2 C v V a8 l C',
 				keys => [qw(index nameID type amount type_equip cards expire identified)],
 			},
 		},
@@ -854,8 +880,15 @@ sub items_nonstackable {
 	} elsif ($args->{switch} eq '0901' # inventory
 		|| $args->{switch} eq '0976' # storage
 		|| $args->{switch} eq '0903' # cart
+		|| $args->{switch} eq '0906' # other player
 	) {
 		return $items->{type5};
+	} elsif ($args->{switch} eq '0992' # inventory
+		|| $args->{switch} eq '0994' # cart
+		|| $args->{switch} eq '0996' # storage
+		|| $args->{switch} eq '0997' # other player
+	) {
+		return $items->{type6};
 	} else {
 		warning "items_nonstackable: unsupported packet ($args->{switch})!\n";
 	}
@@ -890,7 +923,11 @@ sub items_stackable {
 		|| $args->{switch} eq '0902' # cart
 	) {
 		return $items->{type5};
-
+	} elsif ($args->{switch} eq '0991' # inventory
+		|| $args->{switch} eq '0993' # cart
+		|| $args->{switch} eq '0995' # storage
+	) {
+		return $items->{type6};
 	} else {
 		warning "items_stackable: unsupported packet ($args->{switch})!\n";
 	}
@@ -1018,19 +1055,6 @@ sub map_loaded {
 	$messageSender->sendIgnoreAll("all") if ($config{ignoreAll});
 	$messageSender->sendRequestCashItemsList() if ($masterServer->{serverType} eq 'bRO'); # tested at bRO 2013.11.30, request for cashitemslist
 	$messageSender->sendCashShopOpen() if ($config{whenInGame_requestCashPoints});
-}
-
-# TODO: translation-friendly messages
-sub actor_status_active {
-	my ($self, $args) = @_;
-
-	return unless changeToInGameState();
-#	my ($type, $ID, $flag, $tick) = @{$args}{qw(type ID flag tick)};
-	my ($type, $ID, $flag, $tick, $unknown1, $unknown2, $unknown3) = @{$args}{qw(type ID flag tick unknown1 unknown2 unknown3)};
-	my $status = defined $statusHandle{$type} ? $statusHandle{$type} : "UNKNOWN_STATUS_$type";
-	$cart{type} = $unknown1 if ($type == 673 && defined $unknown1 && ($ID eq $accountID)); # for Cart active
-	$args->{skillName} = defined $statusName{$status} ? $statusName{$status} : $status;
-	($args->{actor} = Actor::get($ID))->setStatus($status, $flag, $tick == 9999 ? undef : $tick);
 }
 
 sub area_spell {
@@ -2474,6 +2498,33 @@ sub rates_info {
 	message "=====================================================================\n", "info";
 }
 
+sub rates_info2 {
+	my ($self, $args) = @_;
+	my %rates = (
+		exp => { total => $args->{exp}/(100*10) }, # Value to Percentage => /100
+		death => { total => $args->{death}/(100*10) }, # 1 d.p. => /10
+		drop => { total => $args->{drop}/(100*10) },
+	);
+	
+	# get details
+	for (my $offset = 0; $offset < length($args->{detail}); $offset += 13) {
+		my ($type, $exp, $death, $drop) = unpack("C V3", substr($args->{detail}, $offset, 13));
+		$rates{exp}{$type} = $exp; $rates{death}{$type} = $death; $rates{drop}{$type} = $drop;
+	}
+
+	# we have 4 kinds of detail:
+	# $rates{exp or drop or death}{DETAIL_KIND}
+	# 0 = base server exp (?)
+	# 1 = premium acc additional exp
+	# 2 = server additional exp
+	# 3 = not sure, maybe it's for "extra exp" events? never seen this using the official client (bRO)
+	message T("=========================== Server Infos ===========================\n"), "info";
+	message TF("EXP Rates: %s\% (Base %s\% + Premium %s\% + Server %s\% + Plus %s\%) \n", $rates{exp}{total}, $rates{exp}{0}+100, $rates{exp}{1}, $rates{exp}{2}, $rates{exp}{3}), "info";
+	message TF("Drop Rates: %s\% (Base %s\% + Premium %s\% + Server %s\% + Plus %s\%) \n", $rates{drop}{total}, $rates{drop}{0}+100, $rates{drop}{1}, $rates{drop}{2}, $rates{drop}{3}), "info";
+	message TF("Death Penalty: %s\% (Base %s\% + Premium %s\% + Server %s\% + Plus %s\%) \n", $rates{death}{total}, $rates{death}{0}+100, $rates{death}{1}, $rates{death}{2}, $rates{death}{3}), "info";
+	message "=====================================================================\n", "info";
+}
+
 sub auction_item_request_search {
 	my ($self, $args) = @_;
 
@@ -3105,6 +3156,12 @@ sub quest_all_list2 {
 			}
 		}
 	}
+}
+
+sub show_script {
+	my ($self, $args) = @_;
+	
+	debug "$args->{ID}\n", 'parseMsg';
 }
 
 1;
